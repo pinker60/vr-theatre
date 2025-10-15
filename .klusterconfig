@@ -1,0 +1,5 @@
+{
+  "projectType": "web",
+  "framework": "react",
+  "testing": "jest"
+}

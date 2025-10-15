@@ -1,0 +1,196 @@
+Crea una web app React (senza TypeScript) chiamata "VR Theatre" usando Vite e Tailwind CSS. Il progetto deve essere pronto per sviluppo locale (scripts npm funzionanti) e contenere codice strutturato e commentato. L’obiettivo è una MVP front-end che implementi autenticazione fittizia, gestione profilo, feed di contenuti, modalità VR simulata, e mock per registrazione venditore (Stripe mocked). Non generare backend reale — usa mock locali (localStorage / JSON fittizio) e funzioni async che simulano chiamate API.
+
+Requisiti tecnici
+
+Template: Vite + React (no TypeScript).
+
+Styling: Tailwind CSS (configurazione completa).
+
+Router: react-router-dom.
+
+Stato globale: Zustand (simple store per utente e preferenze).
+
+HTTP: Axios (usato per mock, ma le chiamate possono rinviare a file JSON locali o a funzioni fake).
+
+Icone: react-icons.
+
+SEO: react-helmet.
+
+Modalità VR: componente placeholder VRPlayer.jsx con integrazione base opzionale per react-three-fiber o Three.js (solo setup, senza scene complesse).
+
+Build & dev scripts in package.json: dev, build, preview, lint (se possibile).
+
+Architettura del codice coerente e modulare, con commenti che spiegano il comportamento.
+
+Struttura dei file richiesta (crea file e cartelle):
+
+/src
+  /components
+    Navbar.jsx
+    Footer.jsx
+    CardContent.jsx
+    VRPlayer.jsx
+    AuthForm.jsx
+    PrivateRoute.jsx
+    InfiniteList.jsx
+    ProfileForm.jsx
+    GDPRCheckbox.jsx
+  /pages
+    Home.jsx
+    Login.jsx
+    Register.jsx
+    Profile.jsx
+    VRMode.jsx
+    Privacy.jsx
+    SellerRegister.jsx
+  /store
+    useUserStore.js
+    useFeedStore.js
+  /services
+    api.js               // axios instance + mock wrappers
+    authMock.js          // funzioni: login, register, logout, verifyEmail, resetPassword (fake)
+    feedMock.js          // ritorna pagine di contenuti mock
+  App.jsx
+  main.jsx
+  router.jsx
+  index.css             // include Tailwind directives
+  data/
+    mockContents.json
+    mockUsers.json
+
+
+Dettagli funzionali (implementare):
+
+Autenticazione (mock)
+
+Register con: nome, email, password, conferma password, nome teatro (opzionale), consenso GDPR (checkbox obbligatoria).
+
+Salva utente su localStorage/mockUsers.json via authMock.js.
+
+Login con email+password che verifica i dati mock.
+
+verifyEmail e resetPassword devono essere funzioni simulate: generano token fittizio e cambiano lo stato dell’utente in mock.
+
+PrivateRoute che protegge percorsi come /profile e /vr.
+
+Gestione profilo
+
+Profile page: mostra e modifica nome, teatro, immagine profilo (upload simulato — salva URL base64 in localStorage), preferenze feed (es. ordine: "più recenti" / "consigliati").
+
+Validazioni base dei campi.
+
+Mostra stato email verificata.
+
+Home / Feed
+
+Home mostra lista di CardContent create dalla feedMock.
+
+Card: immagine, titolo, descrizione breve, durata, tag, pulsante "Apri VR" che porta a pagina VRMode con parametri (id contenuto).
+
+Implementa InfiniteList che carica pagine successive dalla feedMock quando si arriva vicino al fondo (lazy loading). Simulare delay nelle risposte.
+
+Funzione di filtro/ordinamento (dropdown): per genere, durata, o "preferiti".
+
+Modalità VR (simulata)
+
+Pagina VRMode con VRPlayer che riceve id del contenuto e carica dati mock.
+
+VRPlayer deve avere:
+
+Toggle: Schermo normale / Modalità VR (cambia layout CSS e mette il player fullscreen simulato).
+
+Pulsanti: play/pause, informazioni, toggle orientamento (orizzontale/verticale).
+
+Se possibile includere commento su come integrare react-three-fiber (ma non necessario creare scena complessa).
+
+Controlli per provare la modalità VR anche su desktop (simulazione).
+
+Registrazione venditore (mock Stripe)
+
+SellerRegister page con form che raccoglie ragione sociale, partita IVA, email contatto, e accordo Terms.
+
+Non integrare Stripe reale: creare un flusso fittizio che mostra "Richiesta inviata" e salva lo stato su localStorage.
+
+Privacy e GDPR
+
+Privacy page con testo statico.
+
+GDPRCheckbox riutilizzabile nei form con link a Privacy.
+
+Durante registrazione il checkbox è obbligatorio.
+
+Accessibilità & Responsività
+
+Layout responsive (mobile-first).
+
+Struttura semantica (header, main, footer).
+
+Tutti i form con label associate e attributi aria-* quando rilevante.
+
+Mock data & API
+
+data/mockContents.json con almeno 12 oggetti contenuto: { id, title, description, image, duration, tags, vrUrl (fittizio) }.
+
+feedMock supporta paginazione page e limit.
+
+Axios api.js esporta una istanza con timeout e funzioni che chiamano i mock.
+
+Styling
+
+Usa Tailwind utility classes.
+
+Crea componenti riutilizzabili e variabili (es. file index.css con directives Tailwind e alcune classi custom se necessario).
+
+Palette colori sobria e leggibile (es. blu scuro per header, sfondo chiaro).
+
+Note per sviluppo & script
+
+package.json deve avere almeno:
+
+"dev": "vite"
+
+"build": "vite build"
+
+"preview": "vite preview"
+
+"lint": "eslint . --ext .js,.jsx" (se ESLint installato)
+
+Aggiungi istruzioni in README: come avviare, porte, e cosa è mockato.
+
+Comportamento desiderato e aspettative
+
+Codice ben commentato e leggibile; ogni componente JSX deve avere breve docstring/commento che spiega lo scopo.
+
+Non usare TypeScript.
+
+Non creare backend reale né chiamate esterne che richiedono API keys.
+
+Tutte le chiamate "API" devono funzionare offline usando i mock.
+
+Fornire una breve sezione nel README che spiega come trasformare i mock in chiamate reali (es. endpoint REST, autenticazione JWT).
+
+Esempio di dati mock (includi nel progetto):
+
+[
+  {
+    "id": "c1",
+    "title": "Spettacolo A - Dietro le quinte",
+    "description": "Un’esperienza immersiva backstage del nuovo allestimento.",
+    "image": "/assets/spettacolo-a.jpg",
+    "duration": 12,
+    "tags": ["drammatico","dietrolequinte"],
+    "vrUrl": "https://example.com/vr/c1"
+  }
+  // ... almeno 12 elementi
+]
+
+
+Deliverable atteso
+
+Progetto React completo con la struttura richiesta.
+
+Funzionalità chiaramente funzionanti in modalità mock.
+
+File README.md con istruzioni rapide per eseguire il progetto.
+
+Commenti inline che spiegano dove e come adattare il codice per integrazione con backend reale o Stripe.

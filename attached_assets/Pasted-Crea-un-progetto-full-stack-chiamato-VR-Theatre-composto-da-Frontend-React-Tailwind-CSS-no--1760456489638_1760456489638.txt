@@ -1,0 +1,243 @@
+Crea un progetto full-stack chiamato “VR Theatre”, composto da:
+
+Frontend: React + Tailwind CSS (no TypeScript)
+
+Backend: Node.js + Express
+
+Database: PostgreSQL o SQLite (scegli automaticamente quello più facile da avviare su Replit)
+
+Autenticazione: JWT (JSON Web Token)
+
+Storage: file system o base64 (per immagini profilo)
+
+Integrazione Stripe: sandbox/test mode per registrazione venditori
+
+Player VR: integrazione base con React Three Fiber (solo visualizzazione)
+
+🎨 FRONTEND
+
+Stack:
+React + Vite + Tailwind CSS + Axios + React Router DOM + Zustand + React Icons + React Helmet
+
+Cartelle frontend:
+
+/client
+  /src
+    /components
+      Navbar.jsx
+      Footer.jsx
+      CardContent.jsx
+      VRPlayer.jsx
+      AuthForm.jsx
+      ProfileForm.jsx
+    /pages
+      Home.jsx
+      Login.jsx
+      Register.jsx
+      Profile.jsx
+      VRMode.jsx
+      Privacy.jsx
+      SellerRegister.jsx
+    /store
+      useUserStore.js
+      useFeedStore.js
+    /services
+      api.js
+    App.jsx
+    main.jsx
+    router.jsx
+    index.css
+
+
+Funzionalità richieste:
+
+Autenticazione completa
+
+Registrazione utente (/register) con nome, email, password, teatro, e consenso GDPR.
+
+Login (/login) con JWT generato dal backend.
+
+Recupero password tramite email simulata (token valido 15 minuti).
+
+Logout che invalida il token.
+
+Persistenza sessione nel localStorage.
+
+Gestione profilo utente
+
+Modifica dati personali e immagine profilo (upload file su backend o base64).
+
+Stato email verificata.
+
+Preferenze utente (es. generi preferiti per feed).
+
+Home page (feed contenuti)
+
+Lista di spettacoli con scroll infinito (chiamata /api/contents?page=1&limit=10).
+
+Filtro per tag o categoria.
+
+Card cliccabile che apre /vr/:id.
+
+Pagina VR
+
+Player 3D o video immersivo (React Three Fiber o iframe 360°).
+
+Toggle "Schermo normale" / "Modalità VR" (fullscreen e CSS VR).
+
+Pulsanti: play/pause, info spettacolo, orientamento schermo.
+
+Gestione venditori / Stripe
+
+Pagina /seller/register: form con nome teatro, email contatto, partita IVA.
+
+Invia richiesta al backend → creazione account Stripe test mode.
+
+Mostra stato registrazione (verificato / in attesa).
+
+Pagine secondarie
+
+/privacy: policy testuale.
+
+Navbar con link a Home, Profilo, VR, Logout.
+
+Footer statico.
+
+⚙️ BACKEND
+
+Stack:
+Node.js + Express + PostgreSQL (o SQLite se Replit non supporta Postgres nativamente) + JWT + bcrypt + Multer (per upload immagini) + Stripe SDK.
+
+Struttura backend:
+
+/server
+  /controllers
+    authController.js
+    userController.js
+    contentController.js
+    stripeController.js
+  /models
+    User.js
+    Content.js
+  /routes
+    authRoutes.js
+    userRoutes.js
+    contentRoutes.js
+    stripeRoutes.js
+  /middleware
+    authMiddleware.js
+  /config
+    db.js
+    stripe.js
+  server.js
+
+
+Dettagli funzionali backend:
+
+Autenticazione (JWT)
+
+POST /api/auth/register: crea utente (bcrypt password).
+
+POST /api/auth/login: restituisce token JWT.
+
+GET /api/auth/me: ritorna dati utente (protetto da token).
+
+POST /api/auth/reset-password: invia email simulata e aggiorna password.
+
+Gestione profilo
+
+GET /api/user/:id: restituisce dati profilo.
+
+PUT /api/user/:id: aggiorna profilo e immagine (upload gestito da Multer).
+
+Contenuti
+
+GET /api/contents: ritorna lista con paginazione e filtri.
+
+GET /api/contents/:id: dettaglio spettacolo.
+
+POST /api/contents: inserisce nuovo spettacolo (solo admin o venditore verificato).
+
+Stripe venditori
+
+POST /api/stripe/register: crea account Stripe in modalità test.
+
+GET /api/stripe/status/:userId: ritorna stato registrazione.
+
+Database
+
+Tabelle:
+
+users(id, name, email, password_hash, theater, is_verified, is_seller, stripe_id, preferences, avatar)
+
+contents(id, title, description, image_url, duration, tags, vr_url, created_by)
+
+Relazioni: contents.created_by → users.id.
+
+Sicurezza
+
+Hash password con bcrypt.
+
+Protezione JWT middleware.
+
+CORS abilitato per frontend su stessa origine.
+
+Rate limiting base su /login e /register.
+
+Configurazioni
+
+File .env con:
+
+PORT=5000
+DATABASE_URL=sqlite:./db.sqlite
+JWT_SECRET=supersegreto
+STRIPE_SECRET_KEY=sk_test_xxx
+
+
+Script per inizializzare database e contenuti demo.
+
+📦 DATABASE INIZIALE
+
+Crea script server/config/seed.js per popolare:
+
+1 utente admin (email: admin@test.com
+, password: admin123)
+
+10 contenuti demo (titolo, descrizione, immagine, durata, tags, vr_url)
+
+🚀 COMANDI DI ESECUZIONE
+
+Nel file package.json (root):
+
+{
+  "scripts": {
+    "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
+    "dev:client": "cd client && npm run dev",
+    "dev:server": "cd server && nodemon server.js",
+    "build": "cd client && npm run build",
+    "start": "node server/server.js"
+  }
+}
+
+
+Dipendenze principali da installare:
+
+npm install express cors bcrypt jsonwebtoken multer dotenv stripe sqlite3
+npm install -D nodemon concurrently
+cd client
+npm install react react-dom react-router-dom axios tailwindcss postcss autoprefixer zustand react-icons react-helmet @react-three/fiber three
+npx tailwindcss init -p
+
+✅ ASPETTATIVE FINALI
+
+Tutto deve essere completamente funzionante, con database reale e autenticazione JWT.
+
+Il frontend deve comunicare col backend via API RESTful (/api/...).
+
+Il database deve essere persistente (SQLite o Postgres, a seconda di Replit).
+
+Stripe deve operare in modalità test con chiavi sandbox.
+
+I contenuti devono essere caricati dinamicamente dal database e mostrati nel feed.
+
+Il VR Player deve essere attivo e navigabile.
