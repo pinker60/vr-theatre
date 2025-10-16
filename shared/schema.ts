@@ -23,10 +23,10 @@ export const contents = pgTable("contents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
   description: text("description").notNull(),
-  imageUrl: text("image_url").notNull(),
+  image_url: text("image_url").notNull(),
   duration: integer("duration").notNull(), // Duration in minutes
   tags: jsonb("tags").default('[]').notNull(), // Array of tags as JSON
-  vrUrl: text("vr_url").notNull(), // URL to VR content
+  vr_url: text("vr_url").notNull(), // URL to VR content
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

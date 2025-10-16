@@ -12,9 +12,27 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  // Build headers and attach stored JWT token if present
+  const headers: Record<string, string> = {};
+  if (data) headers["Content-Type"] = "application/json";
+
+  try {
+    if (typeof window !== "undefined") {
+      const raw = localStorage.getItem('vr-theatre-user');
+      if (raw) {
+        // Zustand persist stores the state object; try to extract token
+        const parsed = JSON.parse(raw);
+        const token = parsed?.state?.token ?? parsed?.token ?? null;
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+      }
+    }
+  } catch (err) {
+    // ignore localStorage parsing errors and continue without Authorization header
+  }
+
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -29,8 +47,23 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
+    const headers: Record<string, string> = {};
+    try {
+      if (typeof window !== "undefined") {
+        const raw = localStorage.getItem('vr-theatre-user');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const token = parsed?.state?.token ?? parsed?.token ?? null;
+          if (token) headers["Authorization"] = `Bearer ${token}`;
+        }
+      }
+    } catch (err) {
+      // ignore
+    }
+
     const res = await fetch(queryKey.join("/") as string, {
       credentials: "include",
+      headers,
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {

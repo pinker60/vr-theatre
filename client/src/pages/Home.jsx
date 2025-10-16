@@ -15,21 +15,23 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function Home() {
   const { filters, setFilter } = useFeedStore();
   const [page, setPage] = useState(1);
-  const [allContents, setAllContents] = useState([]);
   const observerRef = useRef(null);
 
   // Fetch contents with pagination
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ['/api/contents', page, filters.tag, filters.sortBy],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: String(page),
+        tag: filters.tag,
+        sortBy: filters.sortBy,
+      });
+      const res = await fetch(`/api/contents?${params.toString()}`);
+      if (!res.ok) throw new Error('Errore nel caricamento dei contenuti');
+      return await res.json();
+    },
     enabled: true,
   });
-
-  // Append new contents when data changes
-  useEffect(() => {
-    if (data?.contents) {
-      setAllContents(prev => page === 1 ? data.contents : [...prev, ...data.contents]);
-    }
-  }, [data, page]);
 
   // Intersection Observer for infinite scroll
   useEffect(() => {
@@ -52,7 +54,6 @@ export default function Home() {
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
-    setAllContents([]);
   }, [filters.tag, filters.sortBy]);
 
   return (
@@ -108,8 +109,9 @@ export default function Home() {
 
       {/* Content Feed Section */}
       <section id="content-section" className="max-w-7xl mx-auto px-4 md:px-8 py-16">
+        <div className="sticky top-16 z-40 h-4 border-0 bg-background/95"></div>
         {/* Filter Bar */}
-        <div className="sticky top-20 z-40 bg-background/95 backdrop-blur-md border-y border-border py-4 mb-8 -mx-4 px-4 md:-mx-8 md:px-8">
+        <div className="shadow-md sticky top-20 z-40 bg-background/80 backdrop-blur-md border-y border-border py-4 mb-8 -mx-4 px-4 md:-mx-8 md:px-8">
           <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
             <h2 className="text-2xl md:text-3xl font-serif font-bold">
               Spettacoli VR
@@ -157,10 +159,10 @@ export default function Home() {
               </div>
             ))}
           </div>
-        ) : allContents.length > 0 ? (
+        ) : data?.contents && data.contents.length > 0 ? (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="content-grid">
-              {allContents.map((content) => (
+              {data.contents.map((content) => (
                 <CardContent key={content.id} content={content} />
               ))}
             </div>

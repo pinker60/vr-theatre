@@ -12,6 +12,8 @@ import Profile from "@/pages/Profile";
 import VRMode from "@/pages/VRMode";
 import Privacy from "@/pages/Privacy";
 import SellerRegister from "@/pages/SellerRegister";
+import SellerContents from "@/pages/SellerContents";
+import DBManager from "@/pages/DBManager";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -25,6 +27,8 @@ function Router() {
       <Route path="/vr" component={Home} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/seller/register" component={SellerRegister} />
+      <Route path="/seller/contents" component={SellerContents} />
+      <Route path="/admin/db" component={DBManager} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -4,7 +4,6 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
-.env
 
 
 .github/instructions/kluster-code-verify.instructions.md

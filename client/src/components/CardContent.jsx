@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'wouter';
 import { Play, Clock, Tag } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -8,8 +9,17 @@ import { Button } from '@/components/ui/button';
  * CardContent component - Displays VR content card with 16:9 image ratio
  * Features: Hover zoom effect, play icon overlay, duration and tags
  */
+import defaultVrImg from '../assets/default-theatre.jpg';
+const DEFAULT_IMAGE_URL = defaultVrImg;
+
 export default function CardContent({ content }) {
   const { id, title, description, imageUrl, duration, tags } = content;
+  const [imgSrc, setImgSrc] = useState(imageUrl || DEFAULT_IMAGE_URL);
+
+  // Aggiorna imgSrc se imageUrl cambia (es. cambio contenuto)
+  useEffect(() => {
+    setImgSrc(imageUrl || DEFAULT_IMAGE_URL);
+  }, [imageUrl]);
 
   return (
     <Card 
@@ -19,11 +29,20 @@ export default function CardContent({ content }) {
       {/* Image Container with 16:9 aspect ratio */}
       <div className="relative aspect-video overflow-hidden bg-muted">
         <img
-          src={imageUrl}
+          src={imgSrc}
           alt={title}
           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
           data-testid={`img-content-${id}`}
+          onError={() => setImgSrc(DEFAULT_IMAGE_URL)}
         />
+        {/* Overlay testo VR Theatre solo se immagine di default */}
+        {imgSrc === DEFAULT_IMAGE_URL && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-3xl md:text-4xl font-bold text-white drop-shadow-lg bg-black/40 px-6 py-2 rounded">
+              VR Theatre
+            </span>
+          </div>
+        )}
         
         {/* Gradient Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />

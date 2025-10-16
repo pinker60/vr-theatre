@@ -29,7 +29,7 @@ export default function Privacy() {
           <div className="prose prose-slate max-w-none">
             <h2 className="text-2xl font-semibold mb-4">1. Introduzione</h2>
             <p className="text-muted-foreground mb-6">
-              VR Theatre ("noi", "nostro") è impegnata a proteggere la privacy dei nostri utenti.
+              VR Theatre è impegnata a proteggere la privacy dei nostri utenti.
               Questa Privacy Policy spiega come raccogliamo, utilizziamo e proteggiamo le tue
               informazioni personali in conformità con il GDPR (Regolamento Generale sulla Protezione dei Dati).
             </p>

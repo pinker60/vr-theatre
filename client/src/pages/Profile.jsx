@@ -8,6 +8,8 @@ import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Clock, Heart, Settings } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Link } from 'wouter';
 
 /**
  * Profile page - Two-column layout with avatar/bio and settings
@@ -58,9 +60,14 @@ export default function Profile() {
       <div className="max-w-7xl mx-auto px-4 md:px-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-serif font-bold mb-2" data-testid="text-profile-header">
-            Il Tuo Profilo
-          </h1>
+            <div className="flex items-center gap-4">
+              <h1 className="text-4xl font-serif font-bold mb-2" data-testid="text-profile-header">Il Tuo Profilo</h1>
+              {user?.isSeller ? (
+                <span className="px-3 py-1 rounded-full text-sm bg-amber-200 text-amber-800">Seller</span>
+              ) : (
+                <span className="px-3 py-1 rounded-full text-sm bg-sky-100 text-sky-800">Customer</span>
+              )}
+            </div>
           <p className="text-muted-foreground">
             Gestisci le tue informazioni personali e preferenze
           </p>
@@ -151,6 +158,14 @@ export default function Profile() {
                     </div>
                   </div>
                 </Card>
+                <div className="mt-6 flex gap-3 items-center">
+                  <Link href="/seller/contents">
+                    <Button>Gestisci i tuoi contenuti</Button>
+                  </Link>
+                  <Link href="/admin/db">
+                    <Button variant="outline">DB Manager</Button>
+                  </Link>
+                </div>
               </TabsContent>
             </Tabs>
           </div>

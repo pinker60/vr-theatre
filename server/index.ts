@@ -4,8 +4,11 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+// Increase body parser limits to allow larger JSON / form payloads (e.g. avatar uploads as base64)
+// The limit can be controlled with the BODY_LIMIT environment variable (e.g. "10mb").
+const bodyLimit = process.env.BODY_LIMIT || '10mb';
+app.use(express.json({ limit: bodyLimit }));
+app.use(express.urlencoded({ extended: false, limit: bodyLimit }));
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -40,12 +43,18 @@ app.use((req, res, next) => {
 (async () => {
   const server = await registerRoutes(app);
 
+  // Central error handler. Returns client-friendly status for known errors
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+    // body-parser / express will set `err.type === 'entity.too.large'` for oversized bodies
+    const status = err.status || err.statusCode || (err.type === 'entity.too.large' ? 413 : 500);
+    const message = err.message || (status === 413 ? 'Request entity too large' : 'Internal Server Error');
 
     res.status(status).json({ message });
-    throw err;
+
+    // For server errors keep throwing to surface them in development; for client errors (4xx) don't crash the process
+    if (status >= 500) {
+      throw err;
+    }
   });
 
   // importantly only setup vite in development and after

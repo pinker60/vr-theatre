@@ -1,7 +1,10 @@
+
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { randomUUID } from 'crypto';
 import { storage } from "./storage";
 import bcrypt from "bcrypt";
+import nodemailer from 'nodemailer';
 import jwt from "jsonwebtoken";
 import Stripe from "stripe";
 import { insertUserSchema, insertContentSchema } from "../shared/schema";
@@ -24,9 +27,10 @@ const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 // Stripe initialization - optional for development, required for production
 let stripe: Stripe | null = null;
 if (process.env.STRIPE_SECRET_KEY) {
+  // cast apiVersion to any to avoid type mismatch warnings with the installed stripe types
   stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: "2023-10-16",
-  });
+    apiVersion: "2023-10-16" as any,
+  } as any);
 } else {
   console.warn('WARNING: STRIPE_SECRET_KEY not set. Stripe functionality will be disabled.');
 }
@@ -59,6 +63,21 @@ const authMiddleware = async (req: any, res: any, next: any) => {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
+
+  // POST /api/admin/promote - Promote a user to admin (admin only)
+  app.post('/api/admin/promote', authMiddleware, async (req: any, res: any) => {
+    try {
+      if (!req.user.isAdmin) return res.status(403).json({ message: 'Only admins can promote users' });
+      const { userId } = req.body;
+      if (!userId) return res.status(400).json({ message: 'userId required' });
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ message: 'User not found' });
+      await storage.updateUser(userId, { is_admin: 1 });
+      res.json({ message: 'User promoted to admin' });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
   
   // ===== AUTHENTICATION ROUTES =====
   
@@ -83,16 +102,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Hash password
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      // Create user
+      // Create email verification token and expiry (24 hours)
+      const verificationToken = randomUUID();
+      const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+      // Create user (is_verified defaults to false)
       const user = await storage.createUser({
         name,
         email,
         password: hashedPassword,
         theater: theater || null,
+        verificationToken,
+        verificationExpires,
+        isVerified: false,
       });
 
-      // Generate token
+      // Generate JWT for immediate client use (optional)
       const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+
+      // Send verification email (best-effort)
+      try {
+        // Configure transporter from env
+        const smtpHost = process.env.SMTP_HOST;
+        const smtpPort = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : undefined;
+        const smtpUser = process.env.SMTP_USER;
+        const smtpPass = process.env.SMTP_PASS;
+        const appUrl = process.env.APP_URL || 'http://localhost:3000';
+
+        if (smtpHost && smtpPort && smtpUser && smtpPass) {
+          const transporter = nodemailer.createTransport({
+            host: smtpHost,
+            port: smtpPort,
+            secure: smtpPort === 465, // true for 465, false for other ports
+            auth: { user: smtpUser, pass: smtpPass },
+          });
+
+          const verifyLink = `${appUrl}/api/auth/verify?token=${encodeURIComponent(verificationToken)}`;
+
+          await transporter.sendMail({
+            from: process.env.SMTP_FROM || `no-reply@${new URL(appUrl).hostname}`,
+            to: user.email,
+            subject: 'Verifica la tua email per VR Theatre',
+            text: `Ciao ${user.name || ''},\n\nVisita il seguente link per verificare la tua email:\n${verifyLink}\n\nQuesto link scadrà in 24 ore.`,
+            html: `<p>Ciao ${user.name || ''},</p><p>Visita il seguente link per verificare la tua email:</p><p><a href="${verifyLink}">${verifyLink}</a></p><p>Questo link scadrà in 24 ore.</p>`,
+          });
+        } else {
+          console.warn('SMTP not configured; skipping verification email send');
+        }
+      } catch (mailErr: any) {
+        console.error('Error sending verification email:', mailErr?.message || mailErr);
+      }
 
       // Don't send password back
       const { password: _, ...userWithoutPassword } = user;
@@ -100,9 +159,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json({
         user: userWithoutPassword,
         token,
+        message: 'User created. Please verify your email.'
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/auth/verify - Verify user by token
+  app.get('/api/auth/verify', async (req, res) => {
+    try {
+      const token = req.query.token as string;
+      if (!token) return res.status(400).json({ message: 'Token is required' });
+
+      // Find user by token
+      const user = await storage.getUserByVerificationToken(token);
+      if (!user) return res.status(404).json({ message: 'Token not found or invalid' });
+
+      // Check expiry
+      const now = new Date();
+      const expires = user.verificationExpires ? new Date(user.verificationExpires) : null;
+      if (expires && expires < now) return res.status(400).json({ message: 'Token expired' });
+
+      // Mark user as verified and clear token
+      const updated = await storage.updateUser(user.id, { isVerified: true, verificationToken: null, verificationExpires: null });
+
+      res.json({ message: 'Email verified', user: { id: updated.id, email: updated.email, isVerified: true } });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
     }
   });
 
@@ -222,8 +306,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const limit = parseInt(req.query.limit as string) || 10;
       const tag = (req.query.tag as string) || 'all';
       const sortBy = (req.query.sortBy as string) || 'recent';
+      const sellerId = (req.query.sellerId as string) || undefined;
 
-      const result = await storage.getContents({ page, limit, tag, sortBy });
+  const result = await storage.getContents({ page, limit, tag, sortBy, sellerId });
 
       res.json(result);
     } catch (error: any) {
@@ -253,20 +338,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Only sellers can create content' });
       }
 
-      // Validate request body with Zod
+      // Normalize incoming payload to accept snake_case or camelCase
+      const incoming: any = { ...req.body };
+      if (incoming.image_url && !incoming.imageUrl) incoming.imageUrl = incoming.image_url;
+      if (incoming.vr_url && !incoming.vrUrl) incoming.vrUrl = incoming.vr_url;
+      // tags may come as an array, a JSON-stringified array, or a CSV string
+      if (typeof incoming.tags === 'string') {
+        const t = incoming.tags.trim();
+        if (t.startsWith('[')) {
+          try { incoming.tags = JSON.parse(t); } catch (e) { /* leave as string */ }
+        }
+      }
+
+      // Validate request body with Zod (expects camelCase keys from shared/schema)
       const validation = insertContentSchema.safeParse({
-        ...req.body,
+        ...incoming,
         createdBy: req.user.id,
       });
-      
+
       if (!validation.success) {
         const readableError = fromZodError(validation.error);
         return res.status(400).json({ message: readableError.message });
       }
 
-      const content = await storage.createContent(validation.data);
+      // Map validated camelCase fields to snake_case for storage
+      const v = validation.data as any;
+      const dbPayload: any = {
+        ...v,
+        image_url: v.imageUrl,
+        vr_url: v.vrUrl,
+        tags: v.tags,
+        createdBy: v.createdBy,
+      };
+
+      // Remove camelCase duplicates to avoid confusion in storage layer
+      delete dbPayload.imageUrl;
+      delete dbPayload.vrUrl;
+
+      const content = await storage.createContent(dbPayload);
 
       res.status(201).json(content);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // PUT /api/contents/:id - Update content (protected, only owner)
+  app.put("/api/contents/:id", authMiddleware, async (req: any, res) => {
+    try {
+      const contentId = req.params.id;
+      const existing = await storage.getContentById(contentId);
+      if (!existing) return res.status(404).json({ message: 'Content not found' });
+      if (existing.created_by !== req.user.id) return res.status(403).json({ message: 'Forbidden' });
+
+      // Sanitize and map incoming update payload to DB column names only
+      const raw: any = { ...req.body };
+      // Parse tags if sent as JSON string
+      if (typeof raw.tags === 'string') {
+        const t = raw.tags.trim();
+        if (t.startsWith('[')) {
+          try { raw.tags = JSON.parse(t); } catch (e) { /* leave as string */ }
+        }
+      }
+
+      // Allowed DB fields
+      const allowed = ['title', 'description', 'image_url', 'duration', 'tags', 'vr_url'];
+      const cleaned: any = {};
+      if (raw.title !== undefined) cleaned.title = raw.title;
+      if (raw.description !== undefined) cleaned.description = raw.description;
+      if (raw.duration !== undefined) cleaned.duration = raw.duration;
+      // image: accept camelCase or snake_case
+      if (raw.image_url !== undefined) cleaned.image_url = raw.image_url;
+      else if (raw.imageUrl !== undefined) cleaned.image_url = raw.imageUrl;
+      // vr url
+      if (raw.vr_url !== undefined) cleaned.vr_url = raw.vr_url;
+      else if (raw.vrUrl !== undefined) cleaned.vr_url = raw.vrUrl;
+      // tags
+      if (raw.tags !== undefined) cleaned.tags = raw.tags;
+
+      const updated = await storage.updateContent(contentId, cleaned);
+      return res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // DELETE /api/contents/:id - Delete content (protected, only owner)
+  app.delete("/api/contents/:id", authMiddleware, async (req: any, res) => {
+    try {
+      const contentId = req.params.id;
+      const existing = await storage.getContentById(contentId);
+      if (!existing) return res.status(404).json({ message: 'Content not found' });
+      if (existing.created_by !== req.user.id) return res.status(403).json({ message: 'Forbidden' });
+
+      await storage.deleteContent(contentId);
+      return res.json({ message: 'Deleted' });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -424,5 +590,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const httpServer = createServer(app);
 
+  // ===== ADMIN / DB MANAGEMENT ROUTES =====
+  // GET /api/admin/users - list users (protected, admins only)
+  app.get('/api/admin/users', authMiddleware, async (req: any, res) => {
+    try {
+      if (!req.user?.isAdmin) return res.status(403).json({ message: 'Forbidden' });
+      const users = await storage.getAllUsers();
+      res.json({ users });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // DELETE /api/admin/users/:id - delete a user (protected)
+  app.delete('/api/admin/users/:id', authMiddleware, async (req: any, res) => {
+    try {
+      if (!req.user?.isAdmin) return res.status(403).json({ message: 'Forbidden' });
+      const id = req.params.id;
+      await storage.deleteUser(id);
+      res.json({ message: 'Deleted' });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   return httpServer;
+  // POST /api/admin/promote - Promote a user to admin (admin only)
+  app.post('/api/admin/promote', authMiddleware, async (req: any, res: any) => {
+    try {
+      if (!req.user.isAdmin) return res.status(403).json({ message: 'Only admins can promote users' });
+      const { userId } = req.body;
+      if (!userId) return res.status(400).json({ message: 'userId required' });
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ message: 'User not found' });
+      await storage.updateUser(userId, { is_admin: 1 });
+      res.json({ message: 'User promoted to admin' });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
 }
