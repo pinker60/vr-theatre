@@ -1,6 +1,10 @@
 import { Link } from 'wouter';
-import { Film, Mail, Github, Twitter } from 'lucide-react';
-
+import { 
+  FiFilm, 
+  FiMail, 
+  FiFacebook, 
+  FiInstagram 
+} from 'react-icons/fi';
 /**
  * Footer component - Site-wide footer with links and info
  */
@@ -12,7 +16,7 @@ export default function Footer() {
           {/* Brand */}
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
-              <Film className="h-6 w-6 text-primary" />
+              <FiFilm className="h-6 w-6 text-primary" />
               <span className="text-xl font-serif font-bold text-primary">VR Theatre</span>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -77,12 +81,12 @@ export default function Footer() {
             <h3 className="font-semibold mb-4">Connect</h3>
             <div className="flex space-x-3">
               <a 
-                href="#" 
+                href="mailto:lauria.mario2@gmail.com" 
                 className="p-2 rounded-md hover-elevate transition-all"
                 aria-label="Email"
                 data-testid="social-email"
               >
-                <Mail className="h-5 w-5 text-muted-foreground" />
+                <FiMail className="h-5 w-5 text-muted-foreground" />
               </a>
               <a 
                 href="#" 
@@ -90,7 +94,7 @@ export default function Footer() {
                 aria-label="GitHub"
                 data-testid="social-github"
               >
-                <Github className="h-5 w-5 text-muted-foreground" />
+                <FiFacebook className="h-5 w-5 text-muted-foreground" />
               </a>
               <a 
                 href="#" 
@@ -98,7 +102,7 @@ export default function Footer() {
                 aria-label="Twitter"
                 data-testid="social-twitter"
               >
-                <Twitter className="h-5 w-5 text-muted-foreground" />
+                <FiInstagram className="h-5 w-5 text-muted-foreground" />
               </a>
             </div>
           </div>

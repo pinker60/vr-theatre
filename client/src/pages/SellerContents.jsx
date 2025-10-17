@@ -146,39 +146,51 @@ export default function SellerContents() {
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField name="title" control={form.control} render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Titolo</FormLabel>
+                  <FormItem className="flex flex-row items-center gap-3">
+                    <FormLabel className="w-28 min-w-28">Titolo</FormLabel>
                     <Input placeholder="Titolo" {...field} required />
                   </FormItem>
                 )} />
                 <FormField name="description" control={form.control} render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Descrizione</FormLabel>
+                  <FormItem className="flex flex-row items-center gap-3">
+                    <FormLabel className="w-28 min-w-28">Descrizione</FormLabel>
                     <Textarea placeholder="Descrizione" {...field} required />
                   </FormItem>
                 )} />
                 <FormField name="imageUrl" control={form.control} render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>URL immagine</FormLabel>
+                  <FormItem className="flex flex-row items-center gap-3">
+                    <FormLabel className="w-28 min-w-28">URL immagine</FormLabel>
                     <Input placeholder="https://..." type="url" {...field} required />
                   </FormItem>
                 )} />
                 <FormField name="duration" control={form.control} render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Durata (minuti)</FormLabel>
+                  <FormItem className="flex flex-row items-center gap-3">
+                    <FormLabel className="w-44 min-w-44">Durata (minuti)</FormLabel>
                     <Input placeholder="Durata" type="number" min={1} {...field} required />
                   </FormItem>
                 )} />
                 <FormField name="tags" control={form.control} render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tag (separati da virgola)</FormLabel>
+                  <FormItem className="flex flex-row items-center gap-3">
+                    <FormLabel className="w-28 min-w-28">Tag (separati da virgola)</FormLabel>
                     <Input placeholder="es. teatro,dramma" {...field} />
                   </FormItem>
                 )} />
                 <FormField name="vrUrl" control={form.control} render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>URL VR</FormLabel>
+                  <FormItem className="flex flex-row items-center gap-3">
+                    <FormLabel className="w-28 min-w-28">URL VR</FormLabel>
                     <Input placeholder="https://..." type="url" {...field} required />
+                  </FormItem>
+                )} />
+                <FormField name="amount" control={form.control} render={({ field }) => (
+                  <FormItem className="flex flex-row items-center gap-3">
+                    <FormLabel className="w-44 min-w-44">Costo Biglietto €</FormLabel>
+                    <Input placeholder="10,00" type="number" step={0.01} min={0} {...field} required />
+                  </FormItem>
+                )} />
+                <FormField name="limit" control={form.control} render={({ field }) => (
+                  <FormItem className="flex flex-row items-center gap-3">
+                    <FormLabel className="w-44 min-w-44">Limite (0 per illimitato)</FormLabel>
+                    <Input placeholder="0" type="number"  min={1} {...field} required />
                   </FormItem>
                 )} />
                 <DialogFooter>

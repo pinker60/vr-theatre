@@ -158,14 +158,18 @@ export default function Profile() {
                     </div>
                   </div>
                 </Card>
-                <div className="mt-6 flex gap-3 items-center">
-                  <Link href="/seller/contents">
-                    <Button>Gestisci i tuoi contenuti</Button>
-                  </Link>
-                  <Link href="/admin/db">
-                    <Button variant="outline">DB Manager</Button>
-                  </Link>
-                </div>
+                {user?.isSeller && (
+                  <div className="mt-6 flex gap-3 items-center">
+                    <Link href="/seller/contents">
+                      <Button>Gestisci i tuoi contenuti</Button>
+                    </Link>
+                    {user?.isAdmin && (
+                      <Link href="/admin/db">
+                        <Button variant="outline">DB Manager</Button>
+                      </Link>
+                    )}
+                  </div>
+                )}
               </TabsContent>
             </Tabs>
           </div>

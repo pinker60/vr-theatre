@@ -14,6 +14,8 @@ import Privacy from "@/pages/Privacy";
 import SellerRegister from "@/pages/SellerRegister";
 import SellerContents from "@/pages/SellerContents";
 import DBManager from "@/pages/DBManager";
+import TicketPurchase from "@/pages/TicketPurchase";
+
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -23,7 +25,9 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/profile" component={Profile} />
+      <Route path="/vr/buy/:id" component={TicketPurchase} />
       <Route path="/vr/:id" component={VRMode} />
+      
       <Route path="/vr" component={Home} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/seller/register" component={SellerRegister} />

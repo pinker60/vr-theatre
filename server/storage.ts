@@ -112,6 +112,7 @@ class SqliteStorage implements IStorage {
     } catch (e) {
       // ignore if index creation fails on older sqlite versions
     }
+    //await this.run(`DROP TABLE IF EXISTS contents`);
     await this.run(`
       CREATE TABLE IF NOT EXISTS contents (
         id TEXT PRIMARY KEY,
@@ -122,8 +123,18 @@ class SqliteStorage implements IStorage {
         tags TEXT DEFAULT '[]',
         vr_url TEXT NOT NULL,
         created_by TEXT NOT NULL,
-        created_at DATETIME DEFAULT (datetime('now'))
-      )
+        created_at DATETIME DEFAULT (datetime('now')),
+        event_type TEXT NOT NULL DEFAULT 'ondemand',
+        start_datetime DATETIME,
+        available_until DATETIME,
+        available_tickets INTEGER DEFAULT 0,
+        total_tickets INTEGER DEFAULT 0,
+        unlimited_tickets BOOLEAN DEFAULT FALSE,
+        ticket_price_standard DECIMAL(10,2) DEFAULT 0.00,
+        ticket_price_vip DECIMAL(10,2) DEFAULT 0.00,
+        ticket_price_premium DECIMAL(10,2) DEFAULT 0.00 
+      
+        )
     `);
     // Add is_admin column to existing installs (no-op if column exists)
     try {

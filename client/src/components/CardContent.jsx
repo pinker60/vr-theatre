@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'wouter';
-import { Play, Clock, Tag } from 'lucide-react';
+import { Ticket, Play, Clock, Tag } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -46,18 +46,6 @@ export default function CardContent({ content }) {
         
         {/* Gradient Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-        
-        {/* Play Button - appears on hover */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-          <Link href={`/vr/${id}`} data-testid={`link-play-${id}`}>
-            <Button 
-              size="icon" 
-              className="h-16 w-16 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/30 border-2 border-white/50"
-            >
-              <Play className="h-8 w-8 text-white fill-white" />
-            </Button>
-          </Link>
-        </div>
 
         {/* Duration Badge - bottom left */}
         <div className="absolute bottom-3 left-3">
@@ -104,14 +92,14 @@ export default function CardContent({ content }) {
         )}
 
         {/* CTA Button */}
-        <Link href={`/vr/${id}`}>
+        <Link href={`/vr/buy/${id}`}>
           <Button 
             className="w-full mt-4" 
             variant="default"
             data-testid={`button-open-vr-${id}`}
           >
-            <Play className="h-4 w-4 mr-2" />
-            Open VR Experience
+            <Ticket className="h-4 w-4 mr-2" />
+            Acquista Biglietto
           </Button>
         </Link>
       </div>
