@@ -1,3 +1,4 @@
+
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { randomUUID } from 'crypto';
@@ -307,7 +308,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sortBy = (req.query.sortBy as string) || 'recent';
       const sellerId = (req.query.sellerId as string) || undefined;
 
-      const result = await storage.getContents({ page, limit, tag, sortBy, sellerId });
+  const result = await storage.getContents({ page, limit, tag, sortBy, sellerId });
 
       res.json(result);
     } catch (error: any) {
@@ -339,20 +340,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Normalize incoming payload to accept snake_case or camelCase
       const incoming: any = { ...req.body };
-      
-      // Map snake_case to camelCase for validation
       if (incoming.image_url && !incoming.imageUrl) incoming.imageUrl = incoming.image_url;
       if (incoming.vr_url && !incoming.vrUrl) incoming.vrUrl = incoming.vr_url;
-      if (incoming.event_type && !incoming.eventType) incoming.eventType = incoming.event_type;
-      if (incoming.start_datetime && !incoming.startDatetime) incoming.startDatetime = incoming.start_datetime;
-      if (incoming.available_until && !incoming.availableUntil) incoming.availableUntil = incoming.available_until;
-      if (incoming.available_tickets && !incoming.availableTickets) incoming.availableTickets = incoming.available_tickets;
-      if (incoming.total_tickets && !incoming.totalTickets) incoming.totalTickets = incoming.total_tickets;
-      if (incoming.unlimited_tickets && !incoming.unlimitedTickets) incoming.unlimitedTickets = incoming.unlimited_tickets;
-      if (incoming.ticket_price_standard && !incoming.ticketPriceStandard) incoming.ticketPriceStandard = incoming.ticket_price_standard;
-      if (incoming.ticket_price_vip && !incoming.ticketPriceVip) incoming.ticketPriceVip = incoming.ticket_price_vip;
-      if (incoming.ticket_price_premium && !incoming.ticketPricePremium) incoming.ticketPricePremium = incoming.ticket_price_premium;
-      
       // tags may come as an array, a JSON-stringified array, or a CSV string
       if (typeof incoming.tags === 'string') {
         const t = incoming.tags.trim();
@@ -374,25 +363,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Map validated camelCase fields to snake_case for storage
       const v = validation.data as any;
+      console.log('routes.ts 366 v',v);
       const dbPayload: any = {
-        title: v.title,
-        description: v.description,
-        image_url: v.imageUrl,
-        vr_url: v.vrUrl,
-        duration: v.duration,
+        ...v,
+        imageUrl: v.imageUrl,
+        vrUrl: v.vrUrl,
         tags: v.tags,
-        created_by: v.createdBy,
-        event_type: v.eventType,
-        start_datetime: v.startDatetime,
-        available_until: v.availableUntil,
-        available_tickets: v.availableTickets,
-        total_tickets: v.totalTickets,
-        unlimited_tickets: v.unlimitedTickets,
-        ticket_price_standard: v.ticketPriceStandard,
-        ticket_price_vip: v.ticketPriceVip,
-        ticket_price_premium: v.ticketPricePremium,
+        createdBy: v.createdBy,
       };
-
+      console.log('routes.ts 380 dbPayload ', dbPayload);
       const content = await storage.createContent(dbPayload);
 
       res.status(201).json(content);
@@ -420,58 +399,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Allowed DB fields
-      const allowed = [
-        'title', 'description', 'image_url', 'duration', 'tags', 'vr_url',
-        'event_type', 'start_datetime', 'available_until', 'available_tickets',
-        'total_tickets', 'unlimited_tickets', 'ticket_price_standard',
-        'ticket_price_vip', 'ticket_price_premium'
-      ];
-      
+      const allowed = ['title', 'description', 'image_url', 'duration', 'tags', 'vr_url'];
       const cleaned: any = {};
-      
-      // Map fields from camelCase to snake_case
       if (raw.title !== undefined) cleaned.title = raw.title;
       if (raw.description !== undefined) cleaned.description = raw.description;
       if (raw.duration !== undefined) cleaned.duration = raw.duration;
-      
       // image: accept camelCase or snake_case
       if (raw.image_url !== undefined) cleaned.image_url = raw.image_url;
       else if (raw.imageUrl !== undefined) cleaned.image_url = raw.imageUrl;
-      
       // vr url
       if (raw.vr_url !== undefined) cleaned.vr_url = raw.vr_url;
       else if (raw.vrUrl !== undefined) cleaned.vr_url = raw.vrUrl;
-      
       // tags
       if (raw.tags !== undefined) cleaned.tags = raw.tags;
-      
-      // New event fields - map from camelCase to snake_case
-      if (raw.eventType !== undefined) cleaned.event_type = raw.eventType;
-      else if (raw.event_type !== undefined) cleaned.event_type = raw.event_type;
-      
-      if (raw.startDatetime !== undefined) cleaned.start_datetime = raw.startDatetime;
-      else if (raw.start_datetime !== undefined) cleaned.start_datetime = raw.start_datetime;
-      
-      if (raw.availableUntil !== undefined) cleaned.available_until = raw.availableUntil;
-      else if (raw.available_until !== undefined) cleaned.available_until = raw.available_until;
-      
-      if (raw.availableTickets !== undefined) cleaned.available_tickets = raw.availableTickets;
-      else if (raw.available_tickets !== undefined) cleaned.available_tickets = raw.available_tickets;
-      
-      if (raw.totalTickets !== undefined) cleaned.total_tickets = raw.totalTickets;
-      else if (raw.total_tickets !== undefined) cleaned.total_tickets = raw.total_tickets;
-      
-      if (raw.unlimitedTickets !== undefined) cleaned.unlimited_tickets = raw.unlimitedTickets;
-      else if (raw.unlimited_tickets !== undefined) cleaned.unlimited_tickets = raw.unlimited_tickets;
-      
-      if (raw.ticketPriceStandard !== undefined) cleaned.ticket_price_standard = raw.ticketPriceStandard;
-      else if (raw.ticket_price_standard !== undefined) cleaned.ticket_price_standard = raw.ticket_price_standard;
-      
-      if (raw.ticketPriceVip !== undefined) cleaned.ticket_price_vip = raw.ticketPriceVip;
-      else if (raw.ticket_price_vip !== undefined) cleaned.ticket_price_vip = raw.ticket_price_vip;
-      
-      if (raw.ticketPricePremium !== undefined) cleaned.ticket_price_premium = raw.ticketPricePremium;
-      else if (raw.ticket_price_premium !== undefined) cleaned.ticket_price_premium = raw.ticket_price_premium;
 
       const updated = await storage.updateContent(contentId, cleaned);
       return res.json(updated);
@@ -672,4 +612,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   return httpServer;
+  // POST /api/admin/promote - Promote a user to admin (admin only)
+  app.post('/api/admin/promote', authMiddleware, async (req: any, res: any) => {
+    try {
+      if (!req.user.isAdmin) return res.status(403).json({ message: 'Only admins can promote users' });
+      const { userId } = req.body;
+      if (!userId) return res.status(400).json({ message: 'userId required' });
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ message: 'User not found' });
+      await storage.updateUser(userId, { is_admin: 1 });
+      res.json({ message: 'User promoted to admin' });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
 }

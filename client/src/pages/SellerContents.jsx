@@ -5,8 +5,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Form, FormField, FormItem, FormLabel } from '@/components/ui/form';
+import { Form, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useForm } from 'react-hook-form';
 
@@ -27,6 +28,15 @@ export default function SellerContents() {
       duration: '',
       tags: '',
       vrUrl: '',
+      eventType: '',
+      startDatetime: '',
+      availableUntil: '',
+      availableTickets: '',
+      totalTickets: '',
+      unlimitedTickets: '',
+      ticketPriceStandard: '',
+      ticketPriceVip: '',
+      ticketPricePremium: '',
     },
   });
 
@@ -51,7 +61,23 @@ export default function SellerContents() {
 
   function openCreate() {
     setEditContent(null);
-    form.reset({ title: '', description: '', imageUrl: '', duration: '', tags: '', vrUrl: '' });
+    form.reset({
+      title: '',
+      description: '',
+      imageUrl: '',
+      duration: '',
+      tags: '',
+      vrUrl: '',
+      eventType: '',
+      startDatetime: '',
+      availableUntil: '',
+      availableTickets: '',
+      totalTickets: '',
+      unlimitedTickets: false,
+      ticketPriceStandard: '',
+      ticketPriceVip: '',
+      ticketPricePremium: ''
+    });
     setDialogOpen(true);
   }
 
@@ -80,14 +106,17 @@ export default function SellerContents() {
           }
           return trimmed;
         }
-        // Fallback: convert to string
-        try {
-          return String(t);
-        } catch (e) {
-          return '';
-        }
+        return '';
       })(),
       vrUrl: content.vr_url || '',
+      eventType: content.event_type || '',
+      startDatetime: content.start_datetime || '',
+      availableUntil: content.available_until || '',
+      totalTickets: content.total_tickets?.toString() || '',
+      unlimitedTickets: Boolean(content.unlimited_tickets || false),
+      ticketPriceStandard: content.ticket_price_standard?.toString() || '',
+      ticketPriceVip: content.ticket_price_vip?.toString() || '',
+      ticketPricePremium: content.ticket_price_premium?.toString() || ''
     });
     setDialogOpen(true);
   }
@@ -113,6 +142,14 @@ export default function SellerContents() {
         vr_url: values.vrUrl,
         duration: Number(values.duration),
         tags: values.tags ? values.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+        event_type: values.eventType,
+        start_datetime: values.startDatetime,
+        available_until: values.availableUntil,
+        unlimited_tickets: Boolean(values.unlimitedTickets),
+        total_tickets: Number(values.totalTickets),
+        ticket_price_standard: Number(values.ticketPriceStandard),
+        ticket_price_vip: Number(values.ticketPriceVip),
+        ticket_price_premium: Number(values.ticketPricePremium),
       };
       let res;
       if (editContent) {
@@ -144,7 +181,7 @@ export default function SellerContents() {
               <DialogTitle>{editContent ? 'Modifica contenuto' : 'Crea nuovo contenuto'}</DialogTitle>
             </DialogHeader>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 overflow-auto h-96 pr-2">
                 <FormField name="title" control={form.control} render={({ field }) => (
                   <FormItem className="flex flex-row items-center gap-3">
                     <FormLabel className="w-28 min-w-28">Titolo</FormLabel>
@@ -160,7 +197,7 @@ export default function SellerContents() {
                 <FormField name="imageUrl" control={form.control} render={({ field }) => (
                   <FormItem className="flex flex-row items-center gap-3">
                     <FormLabel className="w-28 min-w-28">URL immagine</FormLabel>
-                    <Input placeholder="https://..." type="url" {...field} required />
+                    <Input placeholder="https://..." type="url" {...field} />
                   </FormItem>
                 )} />
                 <FormField name="duration" control={form.control} render={({ field }) => (
@@ -181,18 +218,104 @@ export default function SellerContents() {
                     <Input placeholder="https://..." type="url" {...field} required />
                   </FormItem>
                 )} />
-                <FormField name="amount" control={form.control} render={({ field }) => (
+                
+                {/* Nuovi campi per il tipo di evento */}
+                <FormField 
+                  name="eventType" 
+                  control={form.control} 
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center gap-3">
+                      <FormLabel className="w-44 min-w-44">Tipo di Evento</FormLabel>
+                      <Select 
+                        value={field.value} 
+                        onValueChange={field.onChange}
+                        defaultValue={'live'}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Seleziona un tipo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="live">Live</SelectItem>
+                          <SelectItem value="onDemand">On Demand</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} 
+                />
+                
+                {/* Campi per le date */}
+                <FormField name="startDatetime" control={form.control} render={({ field }) => (
                   <FormItem className="flex flex-row items-center gap-3">
-                    <FormLabel className="w-44 min-w-44">Costo Biglietto €</FormLabel>
+                    <FormLabel className="w-44 min-w-44">Data e Ora Inizio</FormLabel>
+                    <Input type="datetime-local" {...field} required />
+                  </FormItem>
+                )} />
+                
+                <FormField name="availableUntil" control={form.control} render={({ field }) => (
+                  <FormItem className="flex flex-row items-center gap-3">
+                    <FormLabel className="w-44 min-w-44">Disponibile fino a</FormLabel>
+                    <Input type="datetime-local" {...field} required />
+                  </FormItem>
+                )} />
+                <FormField 
+                  name="unlimitedTickets" 
+                  control={form.control} 
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center gap-3">
+                      <FormLabel className="w-44 min-w-44">Biglietti Illimitati</FormLabel>
+                      <input 
+                        type="checkbox" 
+                        checked={field.value} 
+                        onChange={field.onChange} 
+                        className="w-4 h-4" 
+                      />
+                    </FormItem>
+                  )} 
+                />
+                <FormField 
+                  name="totalTickets" 
+                  control={form.control} 
+                  render={({ field }) => {
+                    const unlimitedTickets = form.watch("unlimitedTickets");
+                    return(
+                      <FormItem className="flex flex-row items-center gap-3">
+                        <FormLabel className={`w-44 min-w-44 ${unlimitedTickets && 'text-gray-400'}`}>Biglietti Totali</FormLabel>
+                        <Input 
+                          placeholder="100" 
+                          type="number" 
+                          min={0} 
+                          {...field} 
+                          required={!unlimitedTickets} // Non obbligatorio se illimitati
+                          disabled={unlimitedTickets}
+                        />
+                      </FormItem>
+                    );
+                    }} 
+                  />
+                
+                {/* Campi per i prezzi dei biglietti */}
+                <FormField name="ticketPriceStandard" control={form.control} render={({ field }) => (
+                  <FormItem className="flex flex-row items-center gap-3">
+                    <FormLabel className="w-44 min-w-44">Prezzo Standard €</FormLabel>
                     <Input placeholder="10,00" type="number" step={0.01} min={0} {...field} required />
                   </FormItem>
                 )} />
-                <FormField name="limit" control={form.control} render={({ field }) => (
+                
+                <FormField name="ticketPriceVip" control={form.control} render={({ field }) => (
                   <FormItem className="flex flex-row items-center gap-3">
-                    <FormLabel className="w-44 min-w-44">Limite (0 per illimitato)</FormLabel>
-                    <Input placeholder="0" type="number"  min={1} {...field} required />
+                    <FormLabel className="w-44 min-w-44">Prezzo VIP €</FormLabel>
+                    <Input placeholder="25,00" type="number" step={0.01} min={0} {...field} required />
                   </FormItem>
                 )} />
+                
+                <FormField name="ticketPricePremium" control={form.control} render={({ field }) => (
+                  <FormItem className="flex flex-row items-center gap-3">
+                    <FormLabel className="w-44 min-w-44">Prezzo Premium €</FormLabel>
+                    <Input placeholder="50,00" type="number" step={0.01} min={0} {...field} required />
+                  </FormItem>
+                )} />
+                
                 <DialogFooter>
                   <Button type="submit">{editContent ? 'Salva modifiche' : 'Crea'}</Button>
                   <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Annulla</Button>
