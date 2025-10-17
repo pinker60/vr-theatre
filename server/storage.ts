@@ -133,12 +133,12 @@ class SqliteStorage implements IStorage {
         ticket_price_standard DECIMAL(10,2) DEFAULT 0.00,
         ticket_price_vip DECIMAL(10,2) DEFAULT 0.00,
         ticket_price_premium DECIMAL(10,2) DEFAULT 0.00 
-      
-        )
+      )
     `);
     // Add is_admin column to existing installs (no-op if column exists)
     try {
       await this.run(`ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0`);
+      
     } catch (e) {
       // ignore if column already exists or DB doesn't support ALTER in this context
     }
@@ -191,6 +191,15 @@ class SqliteStorage implements IStorage {
       tags,
       createdBy: row.created_by || row.createdBy,
       createdAt: row.created_at || row.createdAt,
+      eventType: row.event_type || row.eventType,
+      startDatetime: row.start_datetime || row.startDatetime,
+      availableUntil: row.available_until || row.availableUntil,
+      availableTickets: typeof row.available_tickets === 'number' ? row.available_tickets : Number(row.available_tickets || 0),
+      totalTickets: typeof row.total_tickets === 'number' ? row.total_tickets : Number(row.total_tickets || 0),
+      unlimitedTickets: Boolean(row.unlimited_tickets || row.unlimitedTickets || false),
+      ticketPriceStandard: typeof row.ticket_price_standard === 'number' ? row.ticket_price_standard : Number(row.ticket_price_standard || 0),
+      ticketPriceVip: typeof row.ticket_price_vip === 'number' ? row.ticket_price_vip : Number(row.ticket_price_vip || 0),
+      ticketPricePremium: typeof row.ticket_price_premium === 'number' ? row.ticket_price_premium : Number(row.ticket_price_premium || 0),
     };
   }
 
@@ -264,6 +273,33 @@ class SqliteStorage implements IStorage {
       } else if (key === 'stripeId') {
         setParts.push('stripe_id = ?');
         params.push(userData[key]);
+      } else if (key === 'eventType') {
+        setParts.push('event_type = ?');
+        params.push(userData[key]);
+      } else if (key === 'startDatetime') {
+        setParts.push('start_datetime = ?');
+        params.push(userData[key]);
+      } else if (key === 'availableUntil') {
+        setParts.push('available_until = ?');
+        params.push(userData[key]);
+      } else if (key === 'availableTickets') {
+        setParts.push('available_tickets = ?');
+        params.push(userData[key]);
+      } else if (key === 'totalTickets') {
+        setParts.push('total_tickets = ?');
+        params.push(userData[key]);
+      } else if (key === 'unlimitedTickets') {
+        setParts.push('unlimited_tickets = ?');
+        params.push(userData[key] ? 1 : 0);
+      } else if (key === 'ticketPriceStandard') {
+        setParts.push('ticket_price_standard = ?');
+        params.push(userData[key]);
+      } else if (key === 'ticketPriceVip') {
+        setParts.push('ticket_price_vip = ?');
+        params.push(userData[key]);
+      } else if (key === 'ticketPricePremium') {
+        setParts.push('ticket_price_premium = ?');
+        params.push(userData[key]);
       } else {
         setParts.push(`${key} = ?`);
         params.push(userData[key]);
@@ -319,21 +355,77 @@ class SqliteStorage implements IStorage {
   }
 
   async createContent(content: any) {
+    console.log('storege.ts 323 createContent', content);
     const id = content.id || randomUUID();
     const tags = content.tags ? JSON.stringify(content.tags) : '[]';
-    await this.run(`INSERT INTO contents (id, title, description, image_url, duration, tags, vr_url, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [id, content.title, content.description, content.image_url, content.duration, tags, content.vr_url, content.createdBy]);
+    await this.run(`INSERT INTO contents 
+      (
+      id, 
+      title, 
+      description, 
+      image_url, 
+      duration, 
+      tags, 
+      vr_url,
+      created_by,
+      created_at, 
+      event_type, 
+      start_datetime, 
+      available_until, 
+      available_tickets, 
+      total_tickets, 
+      unlimited_tickets, 
+      ticket_price_standard, 
+      ticket_price_vip, 
+      ticket_price_premium
+      ) 
+      VALUES (?, ?, ?, ?, ?,
+              ?, ?, ?, ?, ?,
+              ?, ?, ?, ?, ?,
+              ?, ?, ?)`,
+      [
+      id, 
+      content.title, 
+      content.description, 
+      content.imageUrl, 
+      content.duration, 
+      tags, 
+      content.vrUrl, 
+      content.createdBy, 
+      content.createdAt, 
+      content.eventType, 
+      content.startDatetime, 
+      content.availableUntil, 
+      content.totalTickets, 
+      content.totalTickets, 
+      content.unlimitedTickets, 
+      content.ticketPriceStandard, 
+      content.ticketPriceVip, 
+      content.ticketPricePremium
+
+    ]);
     return this.getContentById(id);
   }
 
   async updateContent(id: string, data: any) {
     try {
       // Map camelCase to snake_case and allow only DB columns
-      const allowed = new Set(['title', 'description', 'image_url', 'duration', 'tags', 'vr_url']);
+      const allowed = new Set(['title', 'description', 'image_url', 'duration', 'tags', 'vr_url', 'event_type', 'start_datetime', 'available_until', 'available_tickets', 'total_tickets', ' unlimited_tickets', 'ticket_price_standard', 'ticket_price_vip', 'ticket_price_premium']);
       const mapped: any = {};
       for (const key of Object.keys(data)) {
         let col = key;
         if (key === 'imageUrl') col = 'image_url';
         if (key === 'vrUrl') col = 'vr_url';
+        if (key === 'eventType') col = 'event_type';
+        if (key === 'startDatetime') col = 'start_datetime';
+        if (key === 'availableUntil') col = 'available_until';
+        if (key === 'availableTickets') col = 'available_tickets';
+        if (key === 'totalTickets') col = 'total_tickets';
+        if (key === 'unlimitedTickets') col = 'unlimited_tickets';
+        if (key === 'ticketPriceStandard') col = 'ticket_price_standard';
+        if (key === 'ticketPriceVip') col = 'ticket_price_vip';
+        if (key === 'ticketPricePremium') col = 'ticket_price_premium';
+
         if (!allowed.has(col)) continue;
         mapped[col] = data[key];
       }

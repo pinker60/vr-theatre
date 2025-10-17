@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, boolean, integer, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, boolean, integer, timestamp, jsonb, decimal } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -23,12 +23,20 @@ export const contents = pgTable("contents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
   description: text("description").notNull(),
-  image_url: text("image_url").notNull(),
+  imageUrl: text("image_url").notNull(),
   duration: integer("duration").notNull(), // Duration in minutes
   tags: jsonb("tags").default('[]').notNull(), // Array of tags as JSON
-  vr_url: text("vr_url").notNull(), // URL to VR content
+  vrUrl: text("vr_url").notNull(), // URL to VR content
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  eventType: text("event_type").notNull(),
+  startDatetime: timestamp("start_datetime").notNull(),
+  availableUntil: timestamp("available_until").notNull(),
+  unlimitedTickets: boolean("unlimited_tickets").notNull(),
+  totalTickets: integer("total_tickets").notNull().default(0),
+  ticketPriceStandard: decimal("ticket_price_standard").notNull(),
+  ticketPriceVip: decimal("ticket_price_vip").notNull(),
+  ticketPricePremium: decimal("ticket_price_premium").notNull(),
 });
 
 // Define relations
@@ -59,6 +67,14 @@ export const insertContentSchema = createInsertSchema(contents, {
   imageUrl: z.string().url("Invalid image URL"),
   duration: z.number().positive("Duration must be positive"),
   vrUrl: z.string().url("Invalid VR URL"),
+  eventType: z.string().min(1, "Event type is required"),
+  startDatetime: z.string().min(1, "Start datetime is required"),
+  availableUntil: z.string().min(1, "Available until is required"),
+  totalTickets: z.number().int().nonnegative("Total tickets must be non-negative"),
+  unlimitedTickets: z.boolean(),
+  ticketPriceStandard: z.number().nonnegative("Ticket price must be non-negative"),
+  ticketPriceVip: z.number().nonnegative("Ticket price must be non-negative"),
+  ticketPricePremium: z.number().nonnegative("Ticket price must be non-negative"),
 }).omit({
   id: true,
   createdAt: true,
