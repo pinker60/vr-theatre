@@ -246,6 +246,9 @@ class SqliteStorage implements IStorage {
       if (key === 'preferences') {
         setParts.push('preferences = ?');
         params.push(JSON.stringify(userData[key]));
+      } else if (key === 'isVerified') {
+        setParts.push('is_verified = ?');
+        params.push(userData[key] ? 1 : 0);
       } else if (key === 'verificationToken') {
         setParts.push('verification_token = ?');
         params.push(userData[key]);
