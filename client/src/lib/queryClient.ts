@@ -71,7 +71,13 @@ export const getQueryFn: <T>(options: {
     }
 
     await throwIfResNotOk(res);
-    return await res.json();
+    const ct = res.headers.get('content-type') || '';
+    if (ct.includes('application/json')) {
+      return await res.json();
+    } else {
+      const text = await res.text();
+      throw new Error(`Expected JSON but received '${ct}'. Body starts with: ${text.slice(0, 200)}`);
+    }
   };
 
 export const queryClient = new QueryClient({

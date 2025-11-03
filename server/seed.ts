@@ -11,17 +11,18 @@ async function seed() {
 
   try {
     // Create admin user
-    const hashedPassword = await bcrypt.hash("admin123", 10);
+  const hashedPassword = await bcrypt.hash("admin", 10);
     
     const [adminUser] = await db
       .insert(users)
       .values({
-        name: "Admin VR Theatre",
-        email: "admin@test.com",
+        name: "Admin",
+        email: "admin@vr.local",
         password: hashedPassword,
         theater: "VR Theatre Official",
         isVerified: true,
         isSeller: true,
+        // mark as admin explicitly in sqlite storage layer expects is_admin, but drizzle schema uses isVerified/isSeller only; we'll still seed and then promote via API if needed
       })
       .returning()
       .onConflictDoNothing();

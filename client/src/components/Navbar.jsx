@@ -1,17 +1,44 @@
 import { Link, useLocation } from 'wouter';
 import { useUserStore } from '@/store/useUserStore';
 import { Button } from '@/components/ui/button';
-import { Menu, X, User, LogOut, Home, Film } from 'lucide-react';
+import { Menu, X, User, LogOut, Home, Film, ShoppingCart } from 'lucide-react';
 import { useState } from 'react';
+import { useCartStore } from '@/store/useCartStore';
 
 /**
  * Navbar component - Fixed top navigation with backdrop blur
  * Features: Logo, main navigation, auth buttons, mobile menu
  */
 export default function Navbar() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const { user, logout } = useUserStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const cartCount = useCartStore((s) => Object.values(s.items).reduce((a,b)=>a+b.quantity,0));
+
+  const handleVrClick = (e) => {
+    e?.preventDefault?.();
+    const scroll = () => {
+      try {
+        const el = document.getElementById('spettacoli');
+        if (el) {
+          const offset = 80; // navbar height
+          const y = el.getBoundingClientRect().top + window.scrollY - offset;
+          window.scrollTo({ top: y, behavior: 'smooth' });
+          return;
+        }
+      } catch {}
+      // Fallback: set hash so Home effect can pick it up
+      try { window.location.hash = '#spettacoli'; } catch {}
+    };
+    // If already on Home (location doesn't include hash), just scroll
+    if (location === '/' || location === '/#spettacoli') {
+      scroll();
+    } else {
+      setLocation('/#spettacoli');
+      setTimeout(scroll, 50);
+    }
+    setMobileMenuOpen(false);
+  };
 
   const handleLogout = () => {
     logout();
@@ -20,7 +47,8 @@ export default function Navbar() {
 
   const navLinks = [
     { href: '/', label: 'Home', icon: Home },
-    { href: '/vr', label: 'VR Experiences', icon: Film },
+    // Use hash to jump directly to content section
+    { href: '/#spettacoli', label: 'VR Experiences', icon: Film },
   ];
 
   return (
@@ -39,14 +67,34 @@ export default function Navbar() {
           <div className="hidden md:flex items-center space-x-1">
             {navLinks.map((link) => (
               <Link key={link.href} href={link.href} data-testid={`link-${link.label.toLowerCase().replace(' ', '-')}`}>
-                <div className={`flex items-center space-x-2 px-4 py-2 rounded-md transition-all hover-elevate cursor-pointer ${
-                  location === link.href ? 'bg-accent text-accent-foreground' : 'text-foreground'
+                <div onClick={link.href.includes('#spettacoli') ? handleVrClick : undefined} className={`flex items-center space-x-2 px-4 py-2 rounded-md transition-all hover-elevate cursor-pointer ${
+                  (location === link.href || location === link.href.replace(/#.*/, '')) ? 'bg-accent text-accent-foreground' : 'text-foreground'
                 }`}>
                   <link.icon className="h-4 w-4" />
                   <span className="font-medium">{link.label}</span>
                 </div>
               </Link>
             ))}
+            {user?.isAdmin && (
+              <Link href="/admin/settings" data-testid="link-admin-settings">
+                <div className={`flex items-center space-x-2 px-4 py-2 rounded-md transition-all hover-elevate cursor-pointer ${
+                  location === '/admin/settings' ? 'bg-accent text-accent-foreground' : 'text-foreground'
+                }`}>
+                  <span className="font-medium">Admin</span>
+                </div>
+              </Link>
+            )}
+            <Link href="/cart" data-testid="link-cart">
+              <div className={`relative flex items-center space-x-2 px-4 py-2 rounded-md transition-all hover-elevate cursor-pointer ${
+                location === '/cart' ? 'bg-accent text-accent-foreground' : 'text-foreground'
+              }`}>
+                <ShoppingCart className="h-4 w-4" />
+                <span>Carrello</span>
+                {cartCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full px-1">{cartCount}</span>
+                )}
+              </div>
+            </Link>
           </div>
 
           {/* Auth Buttons - Desktop */}
@@ -101,9 +149,9 @@ export default function Navbar() {
             {navLinks.map((link) => (
               <Link key={link.href} href={link.href}>
                 <div
-                  onClick={() => setMobileMenuOpen(false)}
+                  onClick={link.href.includes('#spettacoli') ? handleVrClick : () => setMobileMenuOpen(false)}
                   className={`flex items-center space-x-3 px-4 py-3 rounded-md transition-all hover-elevate cursor-pointer ${
-                    location === link.href ? 'bg-accent text-accent-foreground' : ''
+                    (location === link.href || location === link.href.replace(/#.*/, '')) ? 'bg-accent text-accent-foreground' : ''
                   }`}
                   data-testid={`mobile-link-${link.label.toLowerCase().replace(' ', '-')}`}
                 >
@@ -112,6 +160,31 @@ export default function Navbar() {
                 </div>
               </Link>
             ))}
+            <Link href="/cart">
+              <div
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center space-x-3 px-4 py-3 rounded-md transition-all hover-elevate cursor-pointer ${
+                  location === '/cart' ? 'bg-accent text-accent-foreground' : ''
+                }`}
+                data-testid="mobile-link-cart"
+              >
+                <ShoppingCart className="h-5 w-5" />
+                <span className="font-medium">Carrello{cartCount ? ` (${cartCount})` : ''}</span>
+              </div>
+            </Link>
+            {user?.isAdmin && (
+              <Link href="/admin/settings">
+                <div
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center space-x-3 px-4 py-3 rounded-md transition-all hover-elevate cursor-pointer ${
+                    location === '/admin/settings' ? 'bg-accent text-accent-foreground' : ''
+                  }`}
+                  data-testid="mobile-link-admin-settings"
+                >
+                  <span className="font-medium">Admin</span>
+                </div>
+              </Link>
+            )}
             
             <div className="pt-4 border-t border-border space-y-2">
               {user ? (

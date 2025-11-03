@@ -3,11 +3,15 @@ import { useRoute, useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Calendar, MapPin, Clock, Users, Loader2 } from 'lucide-react';
+import defaultCover from '@/assets/default-theatre.jpg';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useUserStore } from '@/store/useUserStore';
+import { apiRequest } from '@/lib/queryClient';
+import { useCartStore } from '@/store/useCartStore';
 
 /**
  * TicketPurchase page - Acquisto biglietti per eventi
@@ -19,6 +23,9 @@ export default function TicketPurchase() {
   const contentId = params?.id;
   const [ticketCount, setTicketCount] = useState(1);
   const [selectedTicketType, setSelectedTicketType] = useState('standard');
+  const [buyerEmail, setBuyerEmail] = useState('');
+  const { user } = useUserStore();
+  const addToCart = useCartStore((s) => s.addItem);
 
   // Fetch evento by ID
   const { data: event, isLoading, error } = useQuery({
@@ -26,20 +33,50 @@ export default function TicketPurchase() {
     enabled: !!contentId,
   });
 
-  // Tipi di biglietto disponibili
+  // Tipi di biglietto disponibili (dinamici in base all'evento)
   const ticketTypes = [
-    { id: 'standard', name: 'Biglietto Standard', price: 25 },
-    { id: 'vip', name: 'Biglietto VIP', price: 50 },
-    { id: 'premium', name: 'Biglietto Premium', price: 75 }
-  ];
+    { id: 'standard', name: 'Biglietto Standard', price: Number(event?.ticketPriceStandard ?? event?.ticket_price_standard ?? 0) },
+    { id: 'vip', name: 'Biglietto VIP', price: Number(event?.ticketPriceVip ?? event?.ticket_price_vip ?? 0) },
+    { id: 'premium', name: 'Biglietto Premium', price: Number(event?.ticketPricePremium ?? event?.ticket_price_premium ?? 0) }
+  ].filter(t => t.price >= 0);
 
   const selectedTicket = ticketTypes.find(ticket => ticket.id === selectedTicketType);
   const totalPrice = selectedTicket ? selectedTicket.price * ticketCount : 0;
 
-  const handlePurchase = () => {
-    // Simula acquisto biglietto
-    alert(`Acquisto effettuato! ${ticketCount} biglietto(i) ${selectedTicket?.name} per ${event?.title}`);
-    setLocation('/');
+  const handlePurchase = async () => {
+    try {
+      const payload = {
+        contentId,
+        ticketType: selectedTicketType,
+        quantity: ticketCount,
+        method: 'stripe',
+        buyerEmail: user?.email || buyerEmail || undefined,
+      };
+      const res = await apiRequest('POST', '/api/purchase', payload);
+      const data = await res.json();
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      } else if (data.tickets) {
+        alert(`Acquisto completato! Codici biglietto: ${data.tickets.map(t => t.code).join(', ')}`);
+        setLocation('/');
+      } else {
+        alert(data.message || 'Operazione completata');
+      }
+    } catch (e) {
+      alert((e && e.message) || String(e));
+    }
+  };
+
+  const handleAddToCart = () => {
+    if (!selectedTicket) return;
+    addToCart({
+      contentId,
+      contentTitle: event.title,
+      ticketType: selectedTicketType,
+      unitPriceCents: Math.round(Number(selectedTicket.price || 0) * 100),
+      quantity: ticketCount,
+    });
+    alert('Aggiunto al carrello');
   };
 
   if (isLoading) {
@@ -100,31 +137,28 @@ export default function TicketPurchase() {
                 <div className="flex items-start justify-between">
                   <div>
                     <Badge variant="secondary" className="mb-2">
-                      {event.category || 'Intrattenimento'}
+                      {(event.eventType || event.event_type || 'ondemand').toUpperCase()}
                     </Badge>
                     <CardTitle className="text-3xl font-bold">{event.title}</CardTitle>
                   </div>
-                  <Badge variant={event.availableTickets > 0 ? "default" : "destructive"}>
-                    {event.availableTickets > 0 ? `${event.availableTickets} posti disponibili` : 'Esaurito'}
+                  <Badge variant={(event.unlimitedTickets || event.unlimited_tickets || (event.availableTickets ?? event.available_tickets) > 0) ? "default" : "destructive"}>
+                    { (event.unlimitedTickets || event.unlimited_tickets) ? 'Posti illimitati' : ((event.availableTickets ?? event.available_tickets) > 0 ? `${event.availableTickets ?? event.available_tickets} posti disponibili` : 'Esaurito') }
                   </Badge>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Calendar className="h-4 w-4" />
-                  <span>{new Date(event.date).toLocaleDateString('it-IT')}</span>
+                  <span>{formatDateTime(event.startDatetime || event.start_datetime) || 'On‑demand'}</span>
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Clock className="h-4 w-4" />
-                  <span>{event.time || '18:00'}</span>
+                  <span>{event.duration ? `${event.duration} min` : '—'}</span>
                 </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <MapPin className="h-4 w-4" />
-                  <span>{event.location}</span>
-                </div>
+                {/* Nessuna location in schema corrente; rimuoviamo la riga */}
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Users className="h-4 w-4" />
-                  <span>{event.duration || '2 ore'}</span>
+                  <span>{(event.unlimitedTickets || event.unlimited_tickets) ? 'Illimitati' : `${event.availableTickets ?? event.available_tickets ?? 0}/${event.totalTickets ?? event.total_tickets ?? 0}`}</span>
                 </div>
 
                 <div className="pt-4">
@@ -140,9 +174,10 @@ export default function TicketPurchase() {
             <Card>
               <CardContent className="p-0">
                 <img 
-                  src={event.image} 
+                  src={event.imageUrl || event.image_url || defaultCover} 
                   alt={event.title}
                   className="w-full h-64 object-cover rounded-lg"
+                  onError={(e) => { e.currentTarget.src = defaultCover; }}
                 />
               </CardContent>
             </Card>
@@ -184,6 +219,14 @@ export default function TicketPurchase() {
                     ))}
                   </div>
                 </div>
+
+                {/* Email (ospite) */}
+                {!user && (
+                  <div className="space-y-3">
+                    <Label htmlFor="buyerEmail">Email</Label>
+                    <Input id="buyerEmail" type="email" placeholder="la-tua-email@example.com" value={buyerEmail} onChange={(e) => setBuyerEmail(e.target.value)} />
+                  </div>
+                )}
 
                 {/* Selezione Quantità */}
                 <div className="space-y-3">
@@ -229,25 +272,32 @@ export default function TicketPurchase() {
                   </div>
                 </div>
 
-                {/* Bottone Acquista */}
-                <Button 
-                  className="w-full" 
-                  size="lg"
-                  onClick={handlePurchase}
-                  disabled={event.availableTickets === 0}
-                >
-                  {event.availableTickets > 0 ? (
-                    `Acquista Biglietti - €${totalPrice}`
-                  ) : (
-                    'Biglietti Esauriti'
-                  )}
-                </Button>
+                {/* Azioni */}
+                <div className="grid grid-cols-2 gap-3">
+                  <Button 
+                    variant="secondary"
+                    onClick={handleAddToCart}
+                    disabled={!selectedTicket}
+                  >
+                    Aggiungi al Carrello
+                  </Button>
+                  <Button 
+                    className="w-full" 
+                    size="lg"
+                    onClick={handlePurchase}
+                    disabled={!(event.unlimitedTickets || event.unlimited_tickets || (event.availableTickets ?? event.available_tickets) > 0)}
+                  >
+                    {(event.unlimitedTickets || event.unlimited_tickets || (event.availableTickets ?? event.available_tickets) > 0) ? (
+                      `Acquista - €${totalPrice}`
+                    ) : (
+                      'Biglietti Esauriti'
+                    )}
+                  </Button>
+                </div>
 
                 {/* Informazioni aggiuntive */}
                 <div className="text-xs text-muted-foreground space-y-1">
                   <p>• I biglietti sono nominativi e non rimborsabili</p>
-                  <p>• Presentare il biglietto all'ingresso</p>
-                  <p>• L'evento si terrà anche in caso di maltempo</p>
                 </div>
               </CardContent>
             </Card>
@@ -256,4 +306,14 @@ export default function TicketPurchase() {
       </div>
     </div>
   );
+}
+
+function formatDateTime(iso) {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString('it-IT');
+  } catch {
+    return String(iso);
+  }
 }

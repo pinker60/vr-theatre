@@ -56,7 +56,7 @@ export default function Profile() {
   };
 
   return (
-    <div className="min-h-screen pt-24 pb-20">
+    <div className="min-h-full pt-24 pb-20">
       <div className="max-w-7xl mx-auto px-4 md:px-8">
         {/* Header */}
         <div className="mb-8">

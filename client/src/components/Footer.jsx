@@ -3,12 +3,23 @@ import {
   FiFilm, 
   FiMail, 
   FiFacebook, 
-  FiInstagram 
+  FiInstagram,
 } from 'react-icons/fi';
+import { FaXTwitter, FaYoutube } from 'react-icons/fa6';
+import { useQuery } from '@tanstack/react-query';
 /**
  * Footer component - Site-wide footer with links and info
  */
 export default function Footer() {
+  const { data } = useQuery({ queryKey: ['/api/settings'] });
+  const settings = data?.settings || {};
+  const email = settings.supportEmail || settings.companyEmail || null;
+  const links = {
+    facebook: settings.facebookUrl,
+    instagram: settings.instagramUrl,
+    x: settings.twitterUrl, // field stored as twitterUrl, shown as X
+    youtube: settings.youtubeUrl,
+  };
   return (
     <footer className="bg-card border-t border-card-border mt-20">
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-12">
@@ -20,7 +31,7 @@ export default function Footer() {
               <span className="text-xl font-serif font-bold text-primary">VR Theatre</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              Experience the future of theatrical performances in immersive virtual reality.
+              Scopri il futuro degli spettacoli teatrali nella realtà virtuale immersiva.
             </p>
           </div>
 
@@ -45,7 +56,7 @@ export default function Footer() {
               <li>
                 <Link href="/seller/register" data-testid="footer-link-seller">
                   <span className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
-                    Become a Seller
+                    Diventa Venditore
                   </span>
                 </Link>
               </li>
@@ -65,12 +76,12 @@ export default function Footer() {
               </li>
               <li>
                 <span className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
-                  Terms of Service
+                  Termini del Servizio
                 </span>
               </li>
               <li>
                 <span className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
-                  GDPR Compliance
+                  Conformità al GDPR
                 </span>
               </li>
             </ul>
@@ -80,30 +91,60 @@ export default function Footer() {
           <div>
             <h3 className="font-semibold mb-4">Connect</h3>
             <div className="flex space-x-3">
-              <a 
-                href="mailto:lauria.mario2@gmail.com" 
-                className="p-2 rounded-md hover-elevate transition-all"
-                aria-label="Email"
-                data-testid="social-email"
-              >
-                <FiMail className="h-5 w-5 text-muted-foreground" />
-              </a>
-              <a 
-                href="#" 
-                className="p-2 rounded-md hover-elevate transition-all"
-                aria-label="GitHub"
-                data-testid="social-github"
-              >
-                <FiFacebook className="h-5 w-5 text-muted-foreground" />
-              </a>
-              <a 
-                href="#" 
-                className="p-2 rounded-md hover-elevate transition-all"
-                aria-label="Twitter"
-                data-testid="social-twitter"
-              >
-                <FiInstagram className="h-5 w-5 text-muted-foreground" />
-              </a>
+              {email && (
+                <a 
+                  href={`mailto:${email}`}
+                  className="p-2 rounded-md hover-elevate transition-all"
+                  aria-label="Email"
+                  data-testid="email"
+                >
+                  <FiMail className="h-5 w-5 text-muted-foreground" />
+                </a>
+              )}
+              {links.facebook && (
+                <a 
+                  href={links.facebook}
+                  target="_blank" rel="noopener noreferrer"
+                  className="p-2 rounded-md hover-elevate transition-all"
+                  aria-label="Facebook"
+                  data-testid="social-facebook"
+                >
+                  <FiFacebook className="h-5 w-5 text-muted-foreground" />
+                </a>
+              )}
+              {links.instagram && (
+                <a 
+                  href={links.instagram}
+                  target="_blank" rel="noopener noreferrer"
+                  className="p-2 rounded-md hover-elevate transition-all"
+                  aria-label="Instagram"
+                  data-testid="social-instagram"
+                >
+                  <FiInstagram className="h-5 w-5 text-muted-foreground" />
+                </a>
+              )}
+              {links.x && (
+                <a 
+                  href={links.x}
+                  target="_blank" rel="noopener noreferrer"
+                  className="p-2 rounded-md hover-elevate transition-all"
+                  aria-label="X"
+                  data-testid="social-x"
+                >
+                  <FaXTwitter className="h-5 w-5 text-muted-foreground" />
+                </a>
+              )}
+              {links.youtube && (
+                <a 
+                  href={links.youtube}
+                  target="_blank" rel="noopener noreferrer"
+                  className="p-2 rounded-md hover-elevate transition-all"
+                  aria-label="YouTube"
+                  data-testid="social-youtube"
+                >
+                  <FaYoutube className="h-5 w-5 text-muted-foreground" />
+                </a>
+              )}
             </div>
           </div>
         </div>

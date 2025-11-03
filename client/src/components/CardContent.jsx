@@ -91,17 +91,24 @@ export default function CardContent({ content }) {
           </div>
         )}
 
-        {/* CTA Button */}
-        <Link href={`/vr/buy/${id}`}>
-          <Button 
-            className="w-full mt-4" 
-            variant="default"
-            data-testid={`button-open-vr-${id}`}
-          >
-            <Ticket className="h-4 w-4 mr-2" />
-            Acquista Biglietto
-          </Button>
-        </Link>
+        {/* CTA Buttons */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+          <Link href={`/vr/buy/${id}`}>
+            <Button 
+              className="w-full" 
+              variant="default"
+              data-testid={`button-open-vr-${id}`}
+            >
+              <Ticket className="h-4 w-4 mr-2" />
+              Acquista Biglietto
+            </Button>
+          </Link>
+          <Link href={`/vr/redeem/${id}`}>
+            <Button className="w-full" variant="outline">
+              Ho già il biglietto
+            </Button>
+          </Link>
+        </div>
       </div>
     </Card>
   );

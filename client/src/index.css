@@ -353,3 +353,27 @@
     inset: -1px;
   }
 }
+
+/* Print-safe styles to prevent QR codes from being split across pages */
+@media print {
+  /* Avoid splitting individual QR boxes across pages */
+  .qr-card {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  .qr-img {
+    display: block;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    max-width: 100%;
+    height: auto;
+  }
+  .qr-grid {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  /* Slightly reduce margins to maximize fit without clipping */
+  @page {
+    margin: 12mm;
+  }
+}

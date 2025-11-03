@@ -24,6 +24,9 @@ export default function Register() {
         email: data.email,
         password: data.password,
         theater: data.theater || null,
+        gdprConsent: data.gdprConsent,
+        marketingConsent: data.marketingConsent || false,
+        notificationsConsent: data.notificationsConsent || false,
       });
 
       const result = await response.json();

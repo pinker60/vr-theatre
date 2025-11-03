@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useFeedStore } from '@/store/useFeedStore';
 import { Filter, Loader2, Theater } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { allowedTags } from '@/lib/tags';
 
 /**
  * Home page - Hero section + infinite scroll content feed
@@ -56,6 +57,42 @@ export default function Home() {
     setPage(1);
   }, [filters.tag, filters.sortBy]);
 
+  // If URL contains #spettacoli or #vr, scroll to that section after mount/navigate
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const scrollIfHash = () => {
+      if (window.location.hash === '#spettacoli') {
+        // Defer a bit to ensure layout is ready
+        setTimeout(() => {
+          scrollToContent();
+        }, 50);
+      }
+    };
+    scrollIfHash();
+  }, []);
+
+  // Smooth scroll to content with offset for fixed navbar
+  const scrollToContent = () => {
+    if (typeof window === 'undefined') return;
+    const el = document.getElementById('spettacoli');
+    if (!el) return;
+    const offset = 80; // approx navbar height
+    const y = el.getBoundingClientRect().top + window.scrollY - offset;
+    window.scrollTo({ top: y, behavior: 'smooth' });
+  };
+
+  // React to in-page hash changes while staying on Home
+  useEffect(() => {
+    const onHashChange = () => {
+      if (window.location.hash === '#spettacoli') {
+        // Slight delay to ensure layout is ready
+        setTimeout(scrollToContent, 10);
+      }
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
@@ -80,7 +117,7 @@ export default function Home() {
             <Button 
               size="lg" 
               className="bg-white/20 backdrop-blur-md hover:bg-white/30 text-white border-2 border-white/50 text-lg px-8"
-              onClick={() => document.getElementById('content-section')?.scrollIntoView({ behavior: 'smooth' })}
+              onClick={scrollToContent}
               data-testid="button-browse-content"
             >
               <Theater className="h-5 w-5 mr-2" />
@@ -88,7 +125,7 @@ export default function Home() {
             </Button>
             <Link href="/seller/register">
               <Button 
-                size="lg" 
+                size="lg"
                 variant="outline"
                 className="bg-transparent backdrop-blur-md hover:bg-white/10 text-white border-2 border-white/50 text-lg px-8"
                 data-testid="button-become-seller"
@@ -107,8 +144,9 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Content Feed Section */}
-      <section id="content-section" className="max-w-7xl mx-auto px-4 md:px-8 py-16">
+  {/* Content Feed Section */}
+  <div id="spettacoli" />
+  <section id="vr" className="max-w-7xl mx-auto px-4 md:px-8 py-16">
         <div className="sticky top-16 z-40 h-4 border-0 bg-background/95"></div>
         {/* Filter Bar */}
         <div className="shadow-md sticky top-20 z-40 bg-background/80 backdrop-blur-md border-y border-border py-4 mb-8 -mx-4 px-4 md:-mx-8 md:px-8">
@@ -126,11 +164,9 @@ export default function Home() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tutte</SelectItem>
-                  <SelectItem value="drammatico">Drammatico</SelectItem>
-                  <SelectItem value="commedia">Commedia</SelectItem>
-                  <SelectItem value="balletto">Balletto</SelectItem>
-                  <SelectItem value="opera">Opera</SelectItem>
-                  <SelectItem value="dietrolequinte">Dietro le Quinte</SelectItem>
+                  {allowedTags.map(t => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 

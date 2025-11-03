@@ -3,6 +3,7 @@ import { Play, Pause, Info, Maximize, Minimize, Monitor, Glasses } from 'lucide-
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import defaultCover from '@/assets/default-theatre.jpg';
 
 /**
  * VRPlayer component - Immersive VR content player
@@ -69,10 +70,11 @@ export default function VRPlayer({ content }) {
         {/* Placeholder Video/Image */}
         <div className="absolute inset-0 flex items-center justify-center">
           <img 
-            src={content.imageUrl} 
+            src={content.imageUrl || content.image_url || defaultCover} 
             alt={content.title}
             className={`${isVRMode ? 'w-full h-full object-cover' : 'w-full h-full object-contain'}`}
             data-testid="vr-content-display"
+            onError={(e) => { e.currentTarget.src = defaultCover; }}
           />
         </div>
 

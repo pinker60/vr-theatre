@@ -18,6 +18,8 @@ const profileSchema = z.object({
   name: z.string().min(1, 'Nome richiesto'),
   email: z.string().email('Email non valida'),
   theater: z.string().optional(),
+  marketingConsent: z.boolean().optional(),
+  notificationsConsent: z.boolean().optional(),
 });
 
 export default function ProfileForm({ user, onSubmit, isLoading = false }) {
@@ -28,14 +30,19 @@ export default function ProfileForm({ user, onSubmit, isLoading = false }) {
     handleSubmit,
     formState: { errors },
     setValue,
+    watch,
   } = useForm({
     resolver: zodResolver(profileSchema),
     defaultValues: {
       name: user?.name || '',
       email: user?.email || '',
       theater: user?.theater || '',
+      marketingConsent: !!(user?.preferences?.consents?.marketing),
+      notificationsConsent: !!(user?.preferences?.consents?.notifications),
     },
   });
+  const marketingConsent = watch('marketingConsent');
+  const notificationsConsent = watch('notificationsConsent');
 
   const handleImageUpload = (e) => {
     const file = e.target.files?.[0];
@@ -55,6 +62,8 @@ export default function ProfileForm({ user, onSubmit, isLoading = false }) {
     onSubmit({
       ...data,
       avatar: previewAvatar,
+      marketingConsent: !!data.marketingConsent,
+      notificationsConsent: !!data.notificationsConsent,
     });
   };
 
@@ -155,6 +164,28 @@ export default function ProfileForm({ user, onSubmit, isLoading = false }) {
           data-testid="input-profile-theater"
           className="border-2 focus:border-primary"
         />
+      </div>
+
+      {/* Consents */}
+      <div className="space-y-3">
+        <div className="flex items-start gap-3">
+          <input
+            id="marketingConsent"
+            type="checkbox"
+            checked={marketingConsent}
+            onChange={(e) => setValue('marketingConsent', e.target.checked)}
+          />
+          <Label htmlFor="marketingConsent" className="text-sm font-normal cursor-pointer">Consento comunicazioni marketing</Label>
+        </div>
+        <div className="flex items-start gap-3">
+          <input
+            id="notificationsConsent"
+            type="checkbox"
+            checked={notificationsConsent}
+            onChange={(e) => setValue('notificationsConsent', e.target.checked)}
+          />
+          <Label htmlFor="notificationsConsent" className="text-sm font-normal cursor-pointer">Consento notifiche sugli spettacoli</Label>
+        </div>
       </div>
 
       {/* Submit Button */}

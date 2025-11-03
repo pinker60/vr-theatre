@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useUserStore } from '@/store/useUserStore';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Form, FormField, FormItem, FormLabel } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { allowedTags } from '@/lib/tags';
 import { useForm } from 'react-hook-form';
 
 
@@ -25,8 +27,17 @@ export default function SellerContents() {
       description: '',
       imageUrl: '',
       duration: '',
-      tags: '',
+      tags: [],
       vrUrl: '',
+      // New fields
+      eventType: 'ondemand',
+      startDatetime: '', // datetime-local format
+      availableUntil: '', // datetime-local format
+      unlimitedTickets: false,
+      totalTickets: 0,
+      ticketPriceStandard: 0,
+      ticketPriceVip: 0,
+      ticketPricePremium: 0,
     },
   });
 
@@ -51,7 +62,22 @@ export default function SellerContents() {
 
   function openCreate() {
     setEditContent(null);
-    form.reset({ title: '', description: '', imageUrl: '', duration: '', tags: '', vrUrl: '' });
+    form.reset({
+      title: '',
+      description: '',
+      imageUrl: '',
+      duration: '',
+      tags: [],
+      vrUrl: '',
+      eventType: 'ondemand',
+      startDatetime: '',
+      availableUntil: '',
+      unlimitedTickets: false,
+      totalTickets: 0,
+      ticketPriceStandard: 0,
+      ticketPriceVip: 0,
+      ticketPricePremium: 0,
+    });
     setDialogOpen(true);
   }
 
@@ -60,34 +86,33 @@ export default function SellerContents() {
     form.reset({
       title: content.title || '',
       description: content.description || '',
-      imageUrl: content.image_url || '',
+      imageUrl: content.imageUrl || content.image_url || '',
       duration: content.duration?.toString() || '',
       tags: (() => {
         const t = content.tags;
-        if (!t) return '';
-        // If it's already an array
-        if (Array.isArray(t)) return t.join(', ');
-        // If it's a string, it might be a JSON-stringified array like '["a"]' or a CSV
-        if (typeof t === 'string') {
-          const trimmed = t.trim();
-          if (trimmed.startsWith('[')) {
-            try {
-              const parsed = JSON.parse(trimmed);
-              if (Array.isArray(parsed)) return parsed.join(', ');
-            } catch (e) {
-              // fall through to return the raw string
-            }
+        let arr = [];
+        if (Array.isArray(t)) arr = t;
+        else if (typeof t === 'string') {
+          const s = t.trim();
+          if (s.startsWith('[')) {
+            try { const parsed = JSON.parse(s); if (Array.isArray(parsed)) arr = parsed; } catch {}
+          } else if (s.length) {
+            arr = s.split(',').map(x => x.trim()).filter(Boolean);
           }
-          return trimmed;
         }
-        // Fallback: convert to string
-        try {
-          return String(t);
-        } catch (e) {
-          return '';
-        }
+        // keep only allowed
+        const allowed = new Set(allowedTags.map(x => x.value));
+        return arr.filter(x => allowed.has(x));
       })(),
-      vrUrl: content.vr_url || '',
+      vrUrl: content.vrUrl || content.vr_url || '',
+      eventType: content.eventType || content.event_type || 'ondemand',
+      startDatetime: toLocalDatetimeInput(content.startDatetime || content.start_datetime),
+      availableUntil: toLocalDatetimeInput(content.availableUntil || content.available_until),
+      unlimitedTickets: !!(content.unlimitedTickets ?? content.unlimited_tickets),
+      totalTickets: Number(content.totalTickets ?? content.total_tickets ?? 0),
+      ticketPriceStandard: Number(content.ticketPriceStandard ?? content.ticket_price_standard ?? 0),
+      ticketPriceVip: Number(content.ticketPriceVip ?? content.ticket_price_vip ?? 0),
+      ticketPricePremium: Number(content.ticketPricePremium ?? content.ticket_price_premium ?? 0),
     });
     setDialogOpen(true);
   }
@@ -99,6 +124,10 @@ export default function SellerContents() {
       await res.json();
       setContents((c) => c.filter((x) => x.id !== id));
       toast({ title: 'Eliminato', description: 'Contenuto rimosso' });
+      try {
+        await queryClient.invalidateQueries({ queryKey: ['/api/contents'] });
+        await queryClient.refetchQueries({ queryKey: ['/api/contents'], type: 'active' });
+      } catch {}
     } catch (err) {
       toast({ title: 'Errore', description: err.message || String(err), variant: 'destructive' });
     }
@@ -112,8 +141,25 @@ export default function SellerContents() {
         image_url: values.imageUrl,
         vr_url: values.vrUrl,
         duration: Number(values.duration),
-        tags: values.tags ? values.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+        // tags: array for API; sanitize against allowed list
+        tags: Array.isArray(values.tags)
+          ? values.tags.filter(t => allowedTags.some(a => a.value === t))
+          : (values.tags ? String(values.tags).split(',').map((t) => t.trim()).filter(t => allowedTags.some(a => a.value === t)) : []),
+        // pricing and event fields
+        event_type: values.eventType,
+        start_datetime: values.startDatetime ? new Date(values.startDatetime).toISOString() : null,
+        available_until: values.availableUntil ? new Date(values.availableUntil).toISOString() : null,
+        unlimited_tickets: !!values.unlimitedTickets,
+        total_tickets: Number(values.totalTickets || 0),
+        ticket_price_standard: Number(values.ticketPriceStandard || 0),
+        ticket_price_vip: Number(values.ticketPriceVip || 0),
+        ticket_price_premium: Number(values.ticketPricePremium || 0),
       };
+      if (!payload.unlimited_tickets) {
+        payload.available_tickets = payload.total_tickets;
+      } else {
+        payload.available_tickets = 0;
+      }
       let res;
       if (editContent) {
         res = await apiRequest('PUT', `/api/contents/${editContent.id}`, payload);
@@ -125,6 +171,10 @@ export default function SellerContents() {
       form.reset();
       fetchContents();
       toast({ title: editContent ? 'Contenuto aggiornato' : 'Contenuto creato' });
+      try {
+        await queryClient.invalidateQueries({ queryKey: ['/api/contents'] });
+        await queryClient.refetchQueries({ queryKey: ['/api/contents'], type: 'active' });
+      } catch {}
     } catch (err) {
       toast({ title: 'Errore', description: err.message || String(err), variant: 'destructive' });
     }
@@ -160,7 +210,7 @@ export default function SellerContents() {
                 <FormField name="imageUrl" control={form.control} render={({ field }) => (
                   <FormItem className="flex flex-row items-center gap-3">
                     <FormLabel className="w-28 min-w-28">URL immagine</FormLabel>
-                    <Input placeholder="https://..." type="url" {...field} required />
+                    <Input placeholder="https://..." type="url" {...field} />
                   </FormItem>
                 )} />
                 <FormField name="duration" control={form.control} render={({ field }) => (
@@ -169,30 +219,88 @@ export default function SellerContents() {
                     <Input placeholder="Durata" type="number" min={1} {...field} required />
                   </FormItem>
                 )} />
-                <FormField name="tags" control={form.control} render={({ field }) => (
-                  <FormItem className="flex flex-row items-center gap-3">
-                    <FormLabel className="w-28 min-w-28">Tag (separati da virgola)</FormLabel>
-                    <Input placeholder="es. teatro,dramma" {...field} />
-                  </FormItem>
-                )} />
+                <FormField name="tags" control={form.control} render={({ field }) => {
+                  const selected = Array.isArray(field.value) ? field.value : [];
+                  const toggle = (val) => {
+                    const set = new Set(selected);
+                    if (set.has(val)) set.delete(val); else set.add(val);
+                    field.onChange(Array.from(set));
+                  };
+                  return (
+                    <FormItem className="flex flex-col gap-2">
+                      <FormLabel className="">Categorie evento</FormLabel>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        {allowedTags.map(t => (
+                          <label key={t.value} className="flex items-center gap-2 text-sm border rounded-md px-2 py-1 cursor-pointer">
+                            <Checkbox checked={selected.includes(t.value)} onCheckedChange={() => toggle(t.value)} />
+                            <span>{t.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </FormItem>
+                  );
+                }} />
                 <FormField name="vrUrl" control={form.control} render={({ field }) => (
                   <FormItem className="flex flex-row items-center gap-3">
                     <FormLabel className="w-28 min-w-28">URL VR</FormLabel>
                     <Input placeholder="https://..." type="url" {...field} required />
                   </FormItem>
                 )} />
-                <FormField name="amount" control={form.control} render={({ field }) => (
-                  <FormItem className="flex flex-row items-center gap-3">
-                    <FormLabel className="w-44 min-w-44">Costo Biglietto €</FormLabel>
-                    <Input placeholder="10,00" type="number" step={0.01} min={0} {...field} required />
-                  </FormItem>
-                )} />
-                <FormField name="limit" control={form.control} render={({ field }) => (
-                  <FormItem className="flex flex-row items-center gap-3">
-                    <FormLabel className="w-44 min-w-44">Limite (0 per illimitato)</FormLabel>
-                    <Input placeholder="0" type="number"  min={1} {...field} required />
-                  </FormItem>
-                )} />
+                <div className="grid grid-cols-1 gap-4">
+                  <FormField name="eventType" control={form.control} render={({ field }) => (
+                    <FormItem className="flex flex-row items-center gap-3">
+                      <FormLabel className="w-44 min-w-44">Tipo evento</FormLabel>
+                      <select className="flex-1 border rounded-md h-10 px-3" {...field}>
+                        <option value="ondemand">On‑demand</option>
+                        <option value="live">Live</option>
+                      </select>
+                    </FormItem>
+                  )} />
+                  <FormField name="startDatetime" control={form.control} render={({ field }) => (
+                    <FormItem className="flex flex-row items-center gap-3">
+                      <FormLabel className="w-44 min-w-44">Inizio (solo live)</FormLabel>
+                      <Input type="datetime-local" className="flex-1" {...field} />
+                    </FormItem>
+                  )} />
+                  <FormField name="availableUntil" control={form.control} render={({ field }) => (
+                    <FormItem className="flex flex-row items-center gap-3">
+                      <FormLabel className="w-44 min-w-44">Disponibile fino al</FormLabel>
+                      <Input type="datetime-local" className="flex-1" {...field} />
+                    </FormItem>
+                  )} />
+                  <FormField name="unlimitedTickets" control={form.control} render={({ field }) => (
+                    <FormItem className="flex flex-row items-center gap-3">
+                      <FormLabel className="w-44 min-w-44">Biglietti illimitati</FormLabel>
+                      <Checkbox checked={!!field.value} onCheckedChange={(c) => field.onChange(!!c)} />
+                    </FormItem>
+                  )} />
+                  <FormField name="totalTickets" control={form.control} render={({ field }) => (
+                    <FormItem className="flex flex-row items-center gap-3">
+                      <FormLabel className="w-44 min-w-44">Biglietti totali</FormLabel>
+                      <Input placeholder="0" type="number" min={0} disabled={form.watch('unlimitedTickets')} {...field} />
+                    </FormItem>
+                  )} />
+                  <div className="grid grid-cols-1 md:grid-rows-3 gap-3">
+                    <FormField name="ticketPriceStandard" control={form.control} render={({ field }) => (
+                      <FormItem className="flex flex-row items-center gap-3">
+                        <FormLabel className="w-36 min-w-36">Prezzo Standard €</FormLabel>
+                        <Input placeholder="0.00" type="number" step={0.01} min={0} {...field} />
+                      </FormItem>
+                    )} />
+                    <FormField name="ticketPriceVip" control={form.control} render={({ field }) => (
+                      <FormItem className="flex flex-row items-center gap-3">
+                        <FormLabel className="w-36 min-w-36">Prezzo VIP €</FormLabel>
+                        <Input placeholder="0.00" type="number" step={0.01} min={0} {...field} />
+                      </FormItem>
+                    )} />
+                    <FormField name="ticketPricePremium" control={form.control} render={({ field }) => (
+                      <FormItem className="flex flex-row items-center gap-3">
+                        <FormLabel className="w-36 min-w-36">Prezzo Premium €</FormLabel>
+                        <Input placeholder="0.00" type="number" step={0.01} min={0} {...field} />
+                      </FormItem>
+                    )} />
+                  </div>
+                </div>
                 <DialogFooter>
                   <Button type="submit">{editContent ? 'Salva modifiche' : 'Crea'}</Button>
                   <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Annulla</Button>
@@ -213,6 +321,24 @@ export default function SellerContents() {
                 <div>
                   <h3 className="font-semibold">{c.title}</h3>
                   <p className="text-sm text-muted-foreground">{c.description}</p>
+                  <div className="mt-2 text-sm">
+                    <p><span className="font-medium">Tipo:</span> {c.eventType || c.event_type}</p>
+                    { (c.eventType === 'live' || c.event_type === 'live') && (
+                      <p><span className="font-medium">Inizio:</span> {formatDateTime(c.startDatetime || c.start_datetime)}</p>
+                    )}
+                    { (c.availableUntil || c.available_until) && (
+                      <p><span className="font-medium">Disponibile fino al:</span> {formatDateTime(c.availableUntil || c.available_until)}</p>
+                    )}
+                    <p>
+                      <span className="font-medium">Biglietti:</span> {c.unlimitedTickets || c.unlimited_tickets ? 'Illimitati' : `${c.availableTickets ?? c.available_tickets ?? 0}/${c.totalTickets ?? c.total_tickets ?? 0}`}
+                    </p>
+                    <p className="mt-1">
+                      <span className="font-medium">Prezzi:</span>
+                      <span className="ml-2">Std €{(c.ticketPriceStandard ?? c.ticket_price_standard ?? 0).toFixed?.(2) ?? Number(c.ticketPriceStandard ?? c.ticket_price_standard ?? 0).toFixed(2)}</span>
+                      <span className="ml-2">VIP €{(c.ticketPriceVip ?? c.ticket_price_vip ?? 0).toFixed?.(2) ?? Number(c.ticketPriceVip ?? c.ticket_price_vip ?? 0).toFixed(2)}</span>
+                      <span className="ml-2">Prem €{(c.ticketPricePremium ?? c.ticket_price_premium ?? 0).toFixed?.(2) ?? Number(c.ticketPricePremium ?? c.ticket_price_premium ?? 0).toFixed(2)}</span>
+                    </p>
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => openEdit(c)}>Modifica</Button>
@@ -225,4 +351,31 @@ export default function SellerContents() {
       </div>
     </div>
   );
+}
+
+// Helpers
+function toLocalDatetimeInput(iso) {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    const pad = (n) => String(n).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    const mm = pad(d.getMonth() + 1);
+    const dd = pad(d.getDate());
+    const hh = pad(d.getHours());
+    const mi = pad(d.getMinutes());
+    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+  } catch {
+    return '';
+  }
+}
+
+function formatDateTime(iso) {
+  if (!iso) return '-';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString();
+  } catch {
+    return String(iso);
+  }
 }

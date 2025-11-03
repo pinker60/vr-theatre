@@ -28,6 +28,8 @@ const registerSchema = z.object({
   gdprConsent: z.boolean().refine(val => val === true, {
     message: 'Devi accettare la privacy policy'
   }),
+  marketingConsent: z.boolean().optional(),
+  notificationsConsent: z.boolean().optional(),
 }).refine(data => data.password === data.confirmPassword, {
   message: 'Le password non coincidono',
   path: ['confirmPassword'],
@@ -49,10 +51,14 @@ export default function AuthForm({ type = 'login', onSubmit, isLoading = false }
     resolver: zodResolver(schema),
     defaultValues: {
       gdprConsent: false,
+      marketingConsent: false,
+      notificationsConsent: false,
     },
   });
 
   const gdprConsent = watch('gdprConsent');
+  const marketingConsent = watch('marketingConsent');
+  const notificationsConsent = watch('notificationsConsent');
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -198,6 +204,36 @@ export default function AuthForm({ type = 'login', onSubmit, isLoading = false }
               {errors.gdprConsent.message}
             </p>
           )}
+
+          <div className="flex items-start space-x-3">
+            <Checkbox
+              id="marketingConsent"
+              checked={marketingConsent}
+              onCheckedChange={(checked) => setValue('marketingConsent', checked)}
+              data-testid="checkbox-marketing"
+              className="mt-1"
+            />
+            <div className="flex-1">
+              <Label htmlFor="marketingConsent" className="text-sm font-normal cursor-pointer">
+                Acconsento a ricevere comunicazioni marketing
+              </Label>
+            </div>
+          </div>
+
+          <div className="flex items-start space-x-3">
+            <Checkbox
+              id="notificationsConsent"
+              checked={notificationsConsent}
+              onCheckedChange={(checked) => setValue('notificationsConsent', checked)}
+              data-testid="checkbox-notifications"
+              className="mt-1"
+            />
+            <div className="flex-1">
+              <Label htmlFor="notificationsConsent" className="text-sm font-normal cursor-pointer">
+                Acconsento a ricevere notifiche sugli spettacoli
+              </Label>
+            </div>
+          </div>
         </div>
       )}
 

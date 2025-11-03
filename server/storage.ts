@@ -136,6 +136,68 @@ class SqliteStorage implements IStorage {
       
         )
     `);
+      // Application settings (single row JSON store)
+      await this.run(`
+        CREATE TABLE IF NOT EXISTS app_settings (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          data TEXT NOT NULL DEFAULT '{}'
+        )
+      `);
+      // Ensure single row exists
+      try {
+        await this.run(`INSERT INTO app_settings (id, data) VALUES (1, '{}')`);
+      } catch (e) { /* exists */ }
+      // Orders and tickets for purchases
+      await this.run(`
+        CREATE TABLE IF NOT EXISTS orders (
+          id TEXT PRIMARY KEY,
+          content_id TEXT NOT NULL,
+          user_id TEXT,
+          buyer_email TEXT NOT NULL,
+          ticket_type TEXT NOT NULL,
+          quantity INTEGER NOT NULL,
+          total_amount INTEGER NOT NULL,
+          currency TEXT NOT NULL DEFAULT 'eur',
+          status TEXT NOT NULL DEFAULT 'pending',
+          stripe_session_id TEXT,
+          created_at DATETIME DEFAULT (datetime('now')),
+          group_id TEXT
+        )
+      `);
+      // Add group_id to existing installs
+      try { await this.run(`ALTER TABLE orders ADD COLUMN group_id TEXT`); } catch (e) { /* ignore */ }
+
+      // Order groups to support cart checkout and fee breakdown
+      await this.run(`
+        CREATE TABLE IF NOT EXISTS order_groups (
+          id TEXT PRIMARY KEY,
+          user_id TEXT,
+          buyer_email TEXT NOT NULL,
+          subtotal_amount INTEGER NOT NULL,
+          service_fee_amount INTEGER NOT NULL DEFAULT 0,
+          payment_fee_amount INTEGER NOT NULL DEFAULT 0,
+          tax_amount INTEGER NOT NULL DEFAULT 0,
+          total_amount INTEGER NOT NULL,
+          currency TEXT NOT NULL DEFAULT 'eur',
+          status TEXT NOT NULL DEFAULT 'pending',
+          stripe_session_id TEXT,
+          created_at DATETIME DEFAULT (datetime('now'))
+        )
+      `);
+      await this.run(`
+        CREATE TABLE IF NOT EXISTS tickets (
+          id TEXT PRIMARY KEY,
+          order_id TEXT NOT NULL,
+          content_id TEXT NOT NULL,
+          ticket_type TEXT NOT NULL,
+          code TEXT NOT NULL UNIQUE,
+          issued_to TEXT,
+          created_at DATETIME DEFAULT (datetime('now'))
+        )
+      `);
+      // add usage columns if missing
+      try { await this.run(`ALTER TABLE tickets ADD COLUMN used_at DATETIME`); } catch (e) { /* ignore */ }
+      try { await this.run(`ALTER TABLE tickets ADD COLUMN used_by TEXT`); } catch (e) { /* ignore */ }
     // Add is_admin column to existing installs (no-op if column exists)
     try {
       await this.run(`ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0`);
@@ -191,6 +253,16 @@ class SqliteStorage implements IStorage {
       tags,
       createdBy: row.created_by || row.createdBy,
       createdAt: row.created_at || row.createdAt,
+      // Event/pricing fields (camelCase for frontend)
+      eventType: row.event_type || row.eventType || 'ondemand',
+      startDatetime: row.start_datetime || row.startDatetime || null,
+      availableUntil: row.available_until || row.availableUntil || null,
+      availableTickets: typeof row.available_tickets === 'number' ? row.available_tickets : (row.available_tickets != null ? Number(row.available_tickets) : 0),
+      totalTickets: typeof row.total_tickets === 'number' ? row.total_tickets : (row.total_tickets != null ? Number(row.total_tickets) : 0),
+      unlimitedTickets: typeof row.unlimited_tickets === 'boolean' ? row.unlimited_tickets : !!row.unlimited_tickets,
+      ticketPriceStandard: typeof row.ticket_price_standard === 'number' ? row.ticket_price_standard : (row.ticket_price_standard != null ? Number(row.ticket_price_standard) : 0),
+      ticketPriceVip: typeof row.ticket_price_vip === 'number' ? row.ticket_price_vip : (row.ticket_price_vip != null ? Number(row.ticket_price_vip) : 0),
+      ticketPricePremium: typeof row.ticket_price_premium === 'number' ? row.ticket_price_premium : (row.ticket_price_premium != null ? Number(row.ticket_price_premium) : 0),
     };
   }
 
@@ -324,19 +396,69 @@ class SqliteStorage implements IStorage {
   async createContent(content: any) {
     const id = content.id || randomUUID();
     const tags = content.tags ? JSON.stringify(content.tags) : '[]';
-    await this.run(`INSERT INTO contents (id, title, description, image_url, duration, tags, vr_url, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [id, content.title, content.description, content.image_url, content.duration, tags, content.vr_url, content.createdBy]);
+    // Resolve optional pricing/event fields (accept camelCase or snake_case)
+    const event_type = content.event_type ?? content.eventType ?? 'ondemand';
+    const start_datetime = content.start_datetime ?? content.startDatetime ?? null;
+    const available_until = content.available_until ?? content.availableUntil ?? null;
+    const total_tickets = content.total_tickets ?? content.totalTickets ?? 0;
+    const unlimited_tickets = (content.unlimited_tickets ?? content.unlimitedTickets ?? false) ? 1 : 0;
+    const available_tickets = content.available_tickets ?? content.availableTickets ?? (unlimited_tickets ? 0 : total_tickets);
+    const ticket_price_standard = content.ticket_price_standard ?? content.ticketPriceStandard ?? 0;
+    const ticket_price_vip = content.ticket_price_vip ?? content.ticketPriceVip ?? 0;
+    const ticket_price_premium = content.ticket_price_premium ?? content.ticketPricePremium ?? 0;
+
+    await this.run(
+      `INSERT INTO contents (
+        id, title, description, image_url, duration, tags, vr_url, created_by,
+        event_type, start_datetime, available_until, available_tickets, total_tickets, unlimited_tickets,
+        ticket_price_standard, ticket_price_vip, ticket_price_premium
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        content.title,
+        content.description,
+        content.image_url,
+        content.duration,
+        tags,
+        content.vr_url,
+        content.createdBy,
+        event_type,
+        start_datetime,
+        available_until,
+        available_tickets,
+        total_tickets,
+        unlimited_tickets,
+        ticket_price_standard,
+        ticket_price_vip,
+        ticket_price_premium,
+      ]
+    );
     return this.getContentById(id);
   }
 
   async updateContent(id: string, data: any) {
     try {
       // Map camelCase to snake_case and allow only DB columns
-      const allowed = new Set(['title', 'description', 'image_url', 'duration', 'tags', 'vr_url']);
+      const allowed = new Set([
+        'title', 'description', 'image_url', 'duration', 'tags', 'vr_url',
+        'event_type', 'start_datetime', 'available_until',
+        'available_tickets', 'total_tickets', 'unlimited_tickets',
+        'ticket_price_standard', 'ticket_price_vip', 'ticket_price_premium'
+      ]);
       const mapped: any = {};
       for (const key of Object.keys(data)) {
         let col = key;
         if (key === 'imageUrl') col = 'image_url';
         if (key === 'vrUrl') col = 'vr_url';
+        if (key === 'eventType') col = 'event_type';
+        if (key === 'startDatetime') col = 'start_datetime';
+        if (key === 'availableUntil') col = 'available_until';
+        if (key === 'availableTickets') col = 'available_tickets';
+        if (key === 'totalTickets') col = 'total_tickets';
+        if (key === 'unlimitedTickets') col = 'unlimited_tickets';
+        if (key === 'ticketPriceStandard') col = 'ticket_price_standard';
+        if (key === 'ticketPriceVip') col = 'ticket_price_vip';
+        if (key === 'ticketPricePremium') col = 'ticket_price_premium';
         if (!allowed.has(col)) continue;
         mapped[col] = data[key];
       }
@@ -347,6 +469,9 @@ class SqliteStorage implements IStorage {
         if (key === 'tags') {
           setParts.push('tags = ?');
           params.push(JSON.stringify(mapped[key]));
+        } else if (key === 'unlimited_tickets') {
+          setParts.push('unlimited_tickets = ?');
+          params.push(mapped[key] ? 1 : 0);
         } else {
           setParts.push(`${key} = ?`);
           params.push(mapped[key]);
@@ -377,6 +502,154 @@ class SqliteStorage implements IStorage {
 
   async getUserByStripeId(stripeId: string) {
     return this.get<User>(`SELECT * FROM users WHERE stripe_id = ?`, [stripeId]);
+  }
+
+  // Settings
+  async getSettings(): Promise<any> {
+    const row = await this.get<any>(`SELECT data FROM app_settings WHERE id = 1`);
+    try { return row?.data ? JSON.parse(row.data) : {}; } catch { return {}; }
+  }
+  async updateSettings(partial: any): Promise<any> {
+    const current = await this.getSettings();
+    const merged = { ...current, ...partial };
+    await this.run(`UPDATE app_settings SET data = ? WHERE id = 1`, [JSON.stringify(merged)]);
+    return merged;
+  }
+
+  // Orders helpers
+  async createOrder(data: { id?: string; contentId: string; userId?: string | null; buyerEmail: string; ticketType: string; quantity: number; totalAmount: number; currency?: string; status?: string; stripeSessionId?: string | null; }) {
+    const id = data.id || randomUUID();
+    await this.run(`INSERT INTO orders (id, content_id, user_id, buyer_email, ticket_type, quantity, total_amount, currency, status, stripe_session_id) VALUES (?,?,?,?,?,?,?,?,?,?)`, [
+      id,
+      data.contentId,
+      data.userId || null,
+      data.buyerEmail,
+      data.ticketType,
+      data.quantity,
+      data.totalAmount,
+      data.currency || 'eur',
+      data.status || 'pending',
+      data.stripeSessionId || null,
+    ]);
+    return this.get<any>(`SELECT * FROM orders WHERE id = ?`, [id]);
+  }
+
+  async createOrderInGroup(groupId: string, data: { id?: string; contentId: string; userId?: string | null; buyerEmail: string; ticketType: string; quantity: number; totalAmount: number; currency?: string; status?: string; }) {
+    const id = data.id || randomUUID();
+    await this.run(`INSERT INTO orders (id, content_id, user_id, buyer_email, ticket_type, quantity, total_amount, currency, status, group_id) VALUES (?,?,?,?,?,?,?,?,?,?)`, [
+      id,
+      data.contentId,
+      data.userId || null,
+      data.buyerEmail,
+      data.ticketType,
+      data.quantity,
+      data.totalAmount,
+      data.currency || 'eur',
+      data.status || 'pending',
+      groupId,
+    ]);
+    return this.get<any>(`SELECT * FROM orders WHERE id = ?`, [id]);
+  }
+
+  async setOrderPaid(orderId: string) {
+    await this.run(`UPDATE orders SET status = 'paid' WHERE id = ?`, [orderId]);
+    return this.get<any>(`SELECT * FROM orders WHERE id = ?`, [orderId]);
+  }
+
+  async getOrderByStripeSession(sessionId: string) {
+    return this.get<any>(`SELECT * FROM orders WHERE stripe_session_id = ?`, [sessionId]);
+  }
+
+  async setOrderStripeSession(orderId: string, sessionId: string) {
+    await this.run(`UPDATE orders SET stripe_session_id = ? WHERE id = ?`, [sessionId, orderId]);
+  }
+
+  // Order groups helpers
+  async createOrderGroup(data: { id?: string; userId?: string | null; buyerEmail: string; subtotalAmount: number; serviceFeeAmount: number; paymentFeeAmount: number; taxAmount: number; totalAmount: number; currency?: string; }) {
+    const id = data.id || randomUUID();
+    await this.run(`INSERT INTO order_groups (id, user_id, buyer_email, subtotal_amount, service_fee_amount, payment_fee_amount, tax_amount, total_amount, currency, status) VALUES (?,?,?,?,?,?,?,?,?, 'pending')`, [
+      id,
+      data.userId || null,
+      data.buyerEmail,
+      Math.round(data.subtotalAmount),
+      Math.round(data.serviceFeeAmount || 0),
+      Math.round(data.paymentFeeAmount || 0),
+      Math.round(data.taxAmount || 0),
+      Math.round(data.totalAmount),
+      data.currency || 'eur',
+    ]);
+    return this.get<any>(`SELECT * FROM order_groups WHERE id = ?`, [id]);
+  }
+
+  async setOrderGroupStripeSession(groupId: string, sessionId: string) {
+    await this.run(`UPDATE order_groups SET stripe_session_id = ? WHERE id = ?`, [sessionId, groupId]);
+  }
+
+  async getOrderGroupByStripeSession(sessionId: string) {
+    return this.get<any>(`SELECT * FROM order_groups WHERE stripe_session_id = ?`, [sessionId]);
+  }
+
+  async setOrderGroupPaid(groupId: string) {
+    await this.run(`UPDATE order_groups SET status = 'paid' WHERE id = ?`, [groupId]);
+    // Also mark all child orders as paid
+    await this.run(`UPDATE orders SET status = 'paid' WHERE group_id = ?`, [groupId]);
+    return this.get<any>(`SELECT * FROM order_groups WHERE id = ?`, [groupId]);
+  }
+
+  async getOrderGroup(id: string) {
+    return this.get<any>(`SELECT * FROM order_groups WHERE id = ?`, [id]);
+  }
+
+  async getOrdersByGroupId(groupId: string) {
+    return this.all<any>(`SELECT * FROM orders WHERE group_id = ? ORDER BY created_at ASC`, [groupId]);
+  }
+
+  async getTicketsByOrderIds(orderIds: string[]) {
+    if (!orderIds.length) return [] as any[];
+    const placeholders = orderIds.map(() => '?').join(',');
+    return this.all<any>(`SELECT * FROM tickets WHERE order_id IN (${placeholders}) ORDER BY created_at ASC`, orderIds as any);
+  }
+
+  async issueTickets(order: any) {
+    const tickets: any[] = [];
+    for (let i = 0; i < Number(order.quantity || 0); i++) {
+      const code = 'VR-' + Math.random().toString(36).slice(2, 8).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+      const id = randomUUID();
+      await this.run(`INSERT INTO tickets (id, order_id, content_id, ticket_type, code, issued_to) VALUES (?,?,?,?,?,?)`, [
+        id,
+        order.id,
+        order.content_id,
+        order.ticket_type,
+        code,
+        order.buyer_email,
+      ]);
+      tickets.push({ id, code, ticketType: order.ticket_type });
+    }
+    return tickets;
+  }
+
+  async decrementAvailableTickets(contentId: string, quantity: number) {
+    const row = await this.get<any>(`SELECT unlimited_tickets, available_tickets FROM contents WHERE id = ?`, [contentId]);
+    if (!row) return;
+    const unlimited = !!row.unlimited_tickets;
+    if (unlimited) return; // no decrement
+    const current = Number(row.available_tickets || 0);
+    const next = Math.max(0, current - Number(quantity || 0));
+    await this.run(`UPDATE contents SET available_tickets = ? WHERE id = ?`, [next, contentId]);
+  }
+
+  // Vouchers / Tickets
+  async getTicketByCode(code: string) {
+    return this.get<any>(`SELECT * FROM tickets WHERE code = ?`, [code]);
+  }
+
+  async redeemTicket(code: string, contentId: string, userId?: string) {
+    const ticket = await this.get<any>(`SELECT * FROM tickets WHERE code = ?`, [code]);
+    if (!ticket) throw new Error('Ticket non trovato');
+    if (ticket.content_id !== contentId) throw new Error('Ticket non valido per questo contenuto');
+    if (ticket.used_at) throw new Error('Ticket già utilizzato');
+    await this.run(`UPDATE tickets SET used_at = datetime('now'), used_by = ? WHERE id = ?`, [userId || null, ticket.id]);
+    return this.get<any>(`SELECT * FROM tickets WHERE id = ?`, [ticket.id]);
   }
 }
 

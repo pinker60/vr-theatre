@@ -1,3 +1,4 @@
+import { navigate } from 'wouter/use-browser-location';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
@@ -16,7 +17,7 @@ export const useUserStore = create(
       
       login: (user, token) => set({ user, token }),
       
-      logout: () => set({ user: null, token: null }),
+      logout: () => set({ user: null, token: null }, navigate('/')),
       
       updateUser: (userData) => set((state) => ({
         user: state.user ? { ...state.user, ...userData } : null
