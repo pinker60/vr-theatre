@@ -120,12 +120,12 @@ export default function Cart() {
         {items.length === 0 ? (
           <div className="text-muted-foreground">Il carrello è vuoto.</div>
         ) : (
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Lista articoli */}
-            <div className="md:col-span-2 space-y-4">
+            <div className="sm:w-full md:col-span-2 space-y-4">
               {items.map((it) => (
                 <Card key={it.id}>
-                  <CardContent className="p-4 flex items-center justify-between gap-4">
+                  <CardContent className="p-4 flex-wrap items-center justify-between gap-4">
                     <div>
                       <div className="font-medium">{it.contentTitle}</div>
                       <div className="text-sm text-muted-foreground">
